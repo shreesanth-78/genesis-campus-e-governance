@@ -55,6 +55,8 @@ Design principles: **the server is the authority** (the browser only hides butto
 
 **Live link: https://genesis-campus-e-governance.onrender.com**
 
+**Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
+
 The portal is deployed as **one service on Render**: the same address serves the website and the API, with the database on Neon (see [section 11](#11-deployment)). Nothing to install and no sign-up: open the link and use one of the demo accounts below.
 
 ### How to use the live link
@@ -80,7 +82,9 @@ The portal is deployed as **one service on Render**: the same address serves the
 - **Please do not use Settings → "Reset demo data" on the live site.** It is meant for local demos and is refused when the server runs in production mode; leave the shared data alone.
 - **AI features use the server's AI key.** With the key, the chat and the "just dropped" notifications are written by a language model; without it the chat answers with built-in rules and notifications use curated static quotes. Both work and both stay strictly on topic.
 
-### Guided demo (about five minutes)
+### Guided demo (about eight minutes)
+
+**Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
 
 Follow one event from request to registration. Use two windows (one normal, one private) so you can switch roles quickly.
 
