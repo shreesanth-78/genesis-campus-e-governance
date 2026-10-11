@@ -34,7 +34,7 @@ const OK_PHYS = (by, at, refNo, receivedOn) => ({
 const PENDING_ONLINE = { status: 'pending', by: null, at: null, note: '' };
 const PENDING_PHYS = { status: 'pending', by: null, at: null, receivedOn: null, refNo: '', note: '' };
 
-export const SEED_REQUESTS = [
+const RAW_REQUESTS = [
   /* ---------- Already published (mirror the student-facing seed events) ---------- */
   {
     id: 'REQ-1048',
@@ -503,6 +503,22 @@ export const SEED_REQUESTS = [
     ],
   })),
 ];
+
+// Hall permission of the sample requests: approved once a request is past review, pending otherwise.
+export const SEED_REQUESTS = RAW_REQUESTS.map((r) => {
+  const approved =
+    r.onlineReview.status === 'cleared' || ['approved', 'published', 'completed'].includes(r.status);
+  return {
+    ...r,
+    hall: {
+      status: approved ? 'approved' : 'pending',
+      by: approved ? r.onlineReview.by : null,
+      at: approved ? r.onlineReview.at : null,
+      note: '',
+      requestedVenue: r.venue,
+    },
+  };
+});
 
 export const SEED_PROMOTIONS = [
   {

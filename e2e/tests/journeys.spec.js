@@ -45,8 +45,8 @@ async function fillRequestForm(page, title) {
   await page.getByLabel(/Event date/).fill('2026-10-28');
   await page.getByLabel(/Starts/).fill('17:00');
   await page.getByLabel(/Ends/).fill('20:00');
-  await page.locator('#rf-venue').selectOption({ label: 'Seminar Room 3 (holds 45)' });
   await page.getByLabel(/Expected attendance/).fill('40');
+  await page.getByRole('radio', { name: /Seminar Room 3/ }).click();
   await page.getByLabel(/Registration closes/).fill('2026-10-25');
   await page
     .getByLabel('Event poster')
@@ -211,6 +211,10 @@ test.describe('E2E-03 the approval path, role by role', () => {
     // 2. Events Section: online review, hard copy, and no approval button
     const events = await as(browser, 'events', /Welcome back, Rohan/);
     await events.page.goto(`/admin/events/requests/${id}`);
+    // the Events Section gives permission for the hall first; only then can the online review be cleared
+    await expect(events.page.getByRole('button', { name: /Clear online review/ })).toBeDisabled();
+    await events.page.getByRole('button', { name: 'Approve hall' }).click();
+    await expect(events.page.getByRole('button', { name: /Clear online review/ })).toBeEnabled();
     await events.page.getByRole('button', { name: /Clear online review/ }).click();
     await events.page.getByRole('button', { name: /Record hard-copy check/ }).click();
     await events.page.getByLabel('Hard-copy reference no.').fill('EVT/HC/2026/7001');
@@ -568,6 +572,92 @@ test.describe('E2E-09 phone layout', () => {
       });
     }
   }
+});
+
+test.describe('E2E-10 hall selection and permission', () => {
+  test('the club picks a hall with the AI recommendation; the Events Section assigns a bigger one; the club sees it', async ({
+    browser,
+  }) => {
+    const title = 'Hall Night ' + uniq();
+    const club = await as(browser, 'club', /Google Developer Student Clubs/);
+    await club.page.goto('/club/requests/new');
+    await club.page.getByLabel(/Event title/).fill(title);
+    await club.page.getByLabel(/Category/).selectOption('Workshop');
+    await club.page.getByLabel(/Who can attend/).selectOption('All current students');
+    await club.page
+      .getByLabel(/^Description/)
+      .fill('Hands-on session about building small electronics projects with mentors.');
+    await club.page.getByLabel(/Event date/).fill('2026-10-29');
+    await club.page.getByLabel(/Starts/).fill('16:00');
+    await club.page.getByLabel(/Ends/).fill('18:00');
+    await club.page.getByLabel(/Registration closes/).fill('2026-10-27');
+    // the halls follow the number of people expected
+    await club.page.getByLabel(/Expected attendance/).fill('50');
+    await expect(club.page.getByRole('radio').first()).toHaveAccessibleName(/Innovation Lab/);
+    await expect(club.page.getByText('Too small').first()).toBeVisible(); // Seminar Room 3 holds 45
+    await club.page.getByRole('button', { name: /Recommend a hall/ }).click();
+    await expect(club.page.getByRole('status').filter({ hasText: /best fit/ })).toBeVisible({
+      timeout: 20_000,
+    });
+    await club.page.getByRole('button', { name: /Use Innovation Lab/ }).click();
+    await expect(club.page.getByRole('radio', { name: /Innovation Lab/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    // choose the smallest anyway to give the Events Section something to reassign: a bigger hall it can assign
+    await club.page.getByRole('radio', { name: /Seminar Room 3/ }).click();
+    await club.page.getByLabel(/Expected attendance/).fill('40');
+    await club.page
+      .getByLabel('Event poster')
+      .setInputFiles({ name: 'poster.png', mimeType: 'image/png', buffer: PNG });
+    const pdf = (name) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') });
+    await club.page.getByLabel('Faculty coordinator permission letter').setInputFiles(pdf('letter.pdf'));
+    await club.page.getByLabel('Event proposal & budget').setInputFiles(pdf('proposal.pdf'));
+    await club.page.getByLabel('Venue booking form').setInputFiles(pdf('venue.pdf'));
+    await club.page.getByRole('button', { name: /Submit for review/ }).click();
+    await expect(club.page.getByRole('heading', { name: title })).toBeVisible();
+    const id = club.page.url().split('/').pop();
+    await expect(club.page.getByText('Awaiting permission')).toBeVisible();
+
+    const events = await as(browser, 'events', /Welcome back, Rohan/);
+    await events.page.goto('/admin/events/requests/' + id);
+    await events.page.getByRole('button', { name: 'Assign a different hall' }).click();
+    await events.page.getByLabel(/New hall/).selectOption('Innovation Lab');
+    await events.page.getByLabel(/Note to the club/).fill('The seminar room is booked for exams.');
+    await events.page.getByRole('button', { name: 'Assign hall' }).click();
+    await expect(events.page.getByText('Hall approved').first()).toBeVisible();
+    await expect(events.page.getByRole('button', { name: /Clear online review/ })).toBeEnabled();
+
+    await club.page.reload();
+    await expect(club.page.getByText(/assigned/).first()).toBeVisible();
+    await expect(club.page.getByText('Hall approved').first()).toBeVisible();
+    for (const c of [club, events]) await c.context.close();
+  });
+
+  test('a hall that cannot be used sends the request back to the club with the reason', async ({
+    browser,
+  }) => {
+    const title = 'No Hall Night ' + uniq();
+    const club = await as(browser, 'club', /Google Developer Student Clubs/);
+    await club.page.goto('/club/requests/new');
+    await fillRequestForm(club.page, title);
+    await club.page.getByRole('button', { name: /Submit for review/ }).click();
+    await expect(club.page.getByRole('heading', { name: title })).toBeVisible();
+    const id = club.page.url().split('/').pop();
+
+    const osa = await as(browser, 'osa', /Welcome back, Meera/);
+    await osa.page.goto('/admin/osa/requests/' + id);
+    await osa.page.getByRole('button', { name: 'Hall can’t be used' }).click();
+    await expect(osa.page.getByRole('button', { name: 'Send back to the club' })).toBeDisabled(); // a reason is required
+    await osa.page.getByLabel(/Why can’t this hall be used/).fill('Closed for repainting that week.');
+    await osa.page.getByRole('button', { name: 'Send back to the club' }).click();
+    await expect(osa.page.getByText('Hall not approved').first()).toBeVisible();
+
+    await club.page.reload();
+    await expect(club.page.getByText(/Closed for repainting that week/).first()).toBeVisible();
+    await expect(club.page.getByRole('link', { name: /Correct & resubmit/ })).toBeVisible();
+    for (const c of [club, osa]) await c.context.close();
+  });
 });
 
 test.describe('E2E-06 demo reset (kept last: it restores the sample data)', () => {

@@ -12,9 +12,10 @@ import { EmptyState, Icon } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useGov } from '../../context/GovContext';
 import { can, deniedReason } from '../../store/permissions';
-import { findConflicts, fmtDate, fmtDateTime, getClubFrom, getRequest, TODAY_ISO } from '../../store/selectors';
+import { findConflicts, fmtDate, fmtDateTime, getClubFrom, getRequest, hallOf, TODAY_ISO } from '../../store/selectors';
 import { precheckRequest, aiMode } from '../../services/ai';
 import { VENUES } from '../../data/govData';
+import HallPermission, { HallBadge } from '../../components/gov/HallPermission';
 import { useAdminBase } from './AdminLayout';
 
 const CORRECTION_REASONS = ['Poster needs changes', 'Missing document', 'Venue/time clash', 'Budget unclear', 'Description incomplete', 'Policy non-compliance'];
@@ -50,6 +51,8 @@ export default function RequestDetail() {
   const club = getClubFrom(state, r.clubId);
   const canReview = can(user, 'request.review');
   const canPhys = can(user, 'request.physical');
+  const canHall = can(user, 'request.hall');
+  const hallApproved = hallOf(r).status === 'approved';
   const canApprove = can(user, 'request.approve');
   const canPublish = can(user, 'request.publish');
   const open = r.status === 'submitted';
@@ -65,6 +68,7 @@ export default function RequestDetail() {
   };
 
   const approveBlockers = [];
+  if (!hallApproved) approveBlockers.push('The hall must be approved');
   if (r.onlineReview.status !== 'cleared') approveBlockers.push('Online review must be cleared');
   if (r.physical.status !== 'verified') approveBlockers.push('Hard-copy letter must be verified');
 
@@ -105,19 +109,33 @@ export default function RequestDetail() {
         </div>
 
         <div className="space-y-6">
-          <Step n={1} title="Online review" badge={<OnlineBadge status={r.onlineReview.status} />}>
+          <Step n={1} title="Hall permission" badge={<HallBadge status={hallOf(r).status} />}>
+            <p className="mb-3 text-[11px] leading-relaxed text-ink-soft">The club asked for this hall with its request. Approve it, assign a hall that fits the expected crowd, or send the request back.</p>
+            <HallPermission
+              request={r}
+              requests={state.requests}
+              canDecide={canHall}
+              open={open}
+              onApprove={() => done(gov.reviewHall(r.id, { decision: 'approve' }), 'Hall approved.')}
+              onReassign={(venue, note) => done(gov.reviewHall(r.id, { decision: 'reassign', venue, note }), 'Hall assigned.')}
+              onReject={(note) => done(gov.reviewHall(r.id, { decision: 'reject', note }), 'Sent back to the club.')}
+            />
+          </Step>
+
+          <Step n={2} title="Online review" badge={<OnlineBadge status={r.onlineReview.status} />}>
             <p className="text-[11px] leading-relaxed text-ink-soft">Check the details, poster and uploaded documents. This is independent of the hard-copy check.</p>
             {r.onlineReview.by && <p className="mt-2 text-[10px] text-ink-mute">Last action by {r.onlineReview.by} · {fmtDateTime(r.onlineReview.at)}</p>}
             {canReview ? (
               <div className="mt-4 flex flex-wrap gap-2">
-                <button disabled={!open || r.onlineReview.status === 'cleared'} onClick={() => done(gov.reviewRequest(r.id, { decision: 'clear' }), 'Online review cleared.')} className="btn-primary disabled:opacity-40"><Icon name="Check" className="h-4 w-4" /> Clear online review</button>
+                <button disabled={!open || !hallApproved || r.onlineReview.status === 'cleared'} onClick={() => done(gov.reviewRequest(r.id, { decision: 'clear' }), 'Online review cleared.')} className="btn-primary disabled:opacity-40"><Icon name="Check" className="h-4 w-4" /> Clear online review</button>
                 <button disabled={!open} onClick={() => setDialog('correction')} className="btn-ghost disabled:opacity-40">Request corrections</button>
                 <button disabled={!open} onClick={() => setDialog('reject')} className="btn-ghost text-rose-ink disabled:opacity-40">Reject</button>
               </div>
             ) : <p className="mt-3 text-[11px] text-ink-mute">{deniedReason('request.review')}</p>}
+            {canReview && open && !hallApproved && <p className="mt-2 text-[10px] text-amber-ink">Approve the hall first: the online review can be cleared once the hall has permission.</p>}
           </Step>
 
-          <Step n={2} title="Hard-copy letter verification" badge={<PhysicalBadge status={r.physical.status} />}>
+          <Step n={3} title="Hard-copy letter verification" badge={<PhysicalBadge status={r.physical.status} />}>
             <p className="text-[11px] leading-relaxed text-ink-soft">Record that the signed permission letter was received on paper and checked. Recorded separately from the online review.</p>
             {r.physical.status !== 'pending' && (
               <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-canvas p-3 text-[11px]">
@@ -132,7 +150,7 @@ export default function RequestDetail() {
             ) : <p className="mt-3 text-[11px] text-ink-mute">{deniedReason('request.physical')}</p>}
           </Step>
 
-          <Step n={3} title="Final approval (OSA)" badge={r.approval ? <span className="pill bg-brand-50 text-brand-700">Granted</span> : <span className="pill bg-[#f1eeee] text-ink-soft">Not yet</span>}>
+          <Step n={4} title="Final approval (OSA)" badge={r.approval ? <span className="pill bg-brand-50 text-brand-700">Granted</span> : <span className="pill bg-[#f1eeee] text-ink-soft">Not yet</span>}>
             {r.approval ? (
               <p className="text-[11px] text-ink-soft">Approved by <b className="text-brand-900">{r.approval.by}</b> · {fmtDateTime(r.approval.at)}{r.approval.note ? ` — “${r.approval.note}”` : ''}</p>
             ) : (
@@ -148,7 +166,7 @@ export default function RequestDetail() {
             ))}
           </Step>
 
-          <Step n={4} title="Publish to students" badge={r.status === 'published' ? <span className="pill bg-brand-800 text-white">Published</span> : null}>
+          <Step n={5} title="Publish to students" badge={r.status === 'published' ? <span className="pill bg-brand-800 text-white">Published</span> : null}>
             <p className="text-[11px] leading-relaxed text-ink-soft">Only OSA-approved events can be published. Publishing adds the event to the Student Dashboard and sends an in-app notification.</p>
             {canPublish && (
               <button disabled={r.status !== 'approved'} onClick={() => setDialog('publish')} className="btn-primary mt-4 disabled:opacity-40"><Icon name="Send" className="h-4 w-4" /> Publish &amp; notify students</button>

@@ -5,6 +5,7 @@ import FileField from '../../components/gov/FileField';
 import { Field, Input, Select, Textarea } from '../../components/gov/Form';
 import { FeedbackList } from '../../components/gov/Tracker';
 import { usePortal } from '../../components/gov/PortalShell';
+import HallPicker from '../../components/gov/HallPicker';
 import { EmptyState, Icon, PageHeader } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useGov } from '../../context/GovContext';
@@ -86,10 +87,10 @@ export default function RequestForm() {
               <Field label="Event date" htmlFor="rf-date" required error={errors.date}><Input id="rf-date" type="date" min={TODAY_ISO} value={f.date} onChange={set('date')} error={errors.date} /></Field>
               <Field label="Starts" htmlFor="rf-st" required error={errors.startTime}><Input id="rf-st" type="time" value={f.startTime} onChange={set('startTime')} error={errors.startTime} /></Field>
               <Field label="Ends" htmlFor="rf-et" required error={errors.endTime}><Input id="rf-et" type="time" value={f.endTime} onChange={set('endTime')} error={errors.endTime} /></Field>
-              <Field className="sm:col-span-2" label="Venue" htmlFor="rf-venue" required error={errors.venue}><Select id="rf-venue" value={f.venue} onChange={set('venue')} error={errors.venue}><option value="">Choose…</option>{VENUES.map((v) => <option key={v.name} value={v.name}>{v.name} (holds {v.capacity})</option>)}</Select></Field>
-              <Field label="Expected attendance" htmlFor="rf-cap" required error={errors.capacity}><Input id="rf-cap" type="number" min="5" value={f.capacity} onChange={set('capacity')} error={errors.capacity} /></Field>
+              <Field label="Expected attendance" htmlFor="rf-cap" required error={errors.capacity} hint="How many registrations you expect: the hall suggestions follow this number."><Input id="rf-cap" type="number" min="5" value={f.capacity} onChange={set('capacity')} error={errors.capacity} /></Field>
               <Field label="Registration closes" htmlFor="rf-rd" required error={errors.regDeadline}><Input id="rf-rd" type="date" min={TODAY_ISO} max={f.date || undefined} value={f.regDeadline} onChange={set('regDeadline')} error={errors.regDeadline} /></Field>
               <Field label="Closing time" htmlFor="rf-rt"><Input id="rf-rt" type="time" value={f.regDeadlineTime} onChange={set('regDeadlineTime')} /></Field>
+              <Field className="sm:col-span-3" label="Hall" htmlFor="rf-venue" required error={errors.venue} hint="Sorted by how well each hall fits your expected attendance."><HallPicker value={f.venue} onChange={(v) => setF((p) => ({ ...p, venue: v }))} attendance={f.capacity} date={f.date} startTime={f.startTime} endTime={f.endTime} category={f.category} requests={gov.state.requests} ignoreId={existing?.id} error={errors.venue} /></Field>
             </div>
             <div className="mt-4 space-y-2" aria-live="polite">
               {conflicts.length > 0 && <div className="flex gap-2 rounded-xl bg-rose-soft px-3 py-2.5 text-[11px] text-rose-ink"><Icon name="AlertTriangle" className="mt-0.5 h-4 w-4 shrink-0" /> {conflicts.map((c) => c.title).join(', ')} is already requested for this venue at an overlapping time. Reviewers will see this clash.</div>}

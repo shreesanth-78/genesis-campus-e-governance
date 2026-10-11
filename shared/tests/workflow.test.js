@@ -61,6 +61,11 @@ describe('end-to-end approval workflow', () => {
     // pending: not visible to students
     expect(publishedEvents(s).length).toBe(before);
 
+    // the online review cannot be cleared until the hall is approved
+    expect(wf.reviewRequest(s, events, rid, { decision: 'clear' }).error).toMatch(
+      /permission for the requested hall/,
+    );
+    s = must(wf.reviewHall(s, events, rid, { decision: 'approve' })).state;
     s = must(wf.reviewRequest(s, events, rid, { decision: 'clear' })).state;
     expect(publishedEvents(s).length).toBe(before);
 

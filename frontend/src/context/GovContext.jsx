@@ -111,6 +111,7 @@ export function GovProvider({ children }) {
       deleteDraft: (id) => run('deleteDraft', id),
       reviewRequest: (id, p) => run('reviewRequest', id, p),
       recordPhysical: (id, p) => run('recordPhysical', id, p),
+      reviewHall: (id, p) => run('reviewHall', id, p),
       finalApprove: (id, p) => run('finalApprove', id, p),
       publishRequest: (id) => run('publishRequest', id),
       createPromotion: (p) => run('createPromotion', p),

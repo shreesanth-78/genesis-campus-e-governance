@@ -11,14 +11,62 @@ export const REQUEST_CATEGORIES = [
 ];
 
 export const VENUES = [
-  { name: 'Main Auditorium', capacity: 600 },
-  { name: 'Innovation Lab', capacity: 60 },
-  { name: 'North Lab · Room 204', capacity: 70 },
-  { name: 'West Sports Hall', capacity: 120 },
-  { name: 'The Courtyard', capacity: 300 },
-  { name: 'Seminar Room 3', capacity: 45 },
-  { name: 'Central Library Hall', capacity: 150 },
-  { name: 'University Amphitheatre', capacity: 800 },
+  {
+    name: 'Main Auditorium',
+    capacity: 600,
+    kind: 'auditorium',
+    location: 'Admin Block',
+    facilities: ['Stage', 'PA system', 'Projector', 'Air conditioning'],
+  },
+  {
+    name: 'Innovation Lab',
+    capacity: 60,
+    kind: 'lab',
+    location: 'Tech Park, 3rd floor',
+    facilities: ['Workstations', 'Wi-Fi', 'Whiteboards', 'Projector'],
+  },
+  {
+    name: 'North Lab · Room 204',
+    capacity: 70,
+    kind: 'lab',
+    location: 'North Block',
+    facilities: ['Workstations', 'Wi-Fi', 'Projector'],
+  },
+  {
+    name: 'West Sports Hall',
+    capacity: 120,
+    kind: 'sports',
+    location: 'West Block',
+    facilities: ['Indoor court', 'Spectator seating', 'Scoreboard'],
+  },
+  {
+    name: 'The Courtyard',
+    capacity: 300,
+    kind: 'open',
+    location: 'Central Campus',
+    facilities: ['Open air', 'Stage area', 'Power points'],
+  },
+  {
+    name: 'Seminar Room 3',
+    capacity: 45,
+    kind: 'seminar',
+    location: 'Academic Block 1',
+    facilities: ['Projector', 'Air conditioning', 'Whiteboard'],
+  },
+  {
+    name: 'Central Library Hall',
+    capacity: 150,
+    kind: 'hall',
+    location: 'Central Library',
+    facilities: ['Projector', 'Air conditioning', 'Quiet space'],
+  },
+  {
+    name: 'University Amphitheatre',
+    capacity: 800,
+    kind: 'amphitheatre',
+    location: 'Main Lawn',
+    facilities: ['Stage', 'Tiered seating', 'PA system'],
+  },
 ];
 
 export const AUDIENCES = [

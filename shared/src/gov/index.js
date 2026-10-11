@@ -12,6 +12,7 @@ export const ACTIONS = Object.freeze({
   deleteDraft: ['club'],
   reviewRequest: ['osa', 'events'],
   recordPhysical: ['osa', 'events'],
+  reviewHall: ['osa', 'events'],
   finalApprove: ['osa'],
   publishRequest: ['osa', 'events'],
   createPromotion: ['club'],
@@ -29,3 +30,4 @@ export * from './views.js';
 export * from './views.js';
 export * from './knowledge.js';
 export * from './copy.js';
+export * from './halls.js';

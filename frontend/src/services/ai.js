@@ -16,6 +16,7 @@ import {
   localDuplicateCheck,
   precheckRequest as precheck,
 } from '@gcc/shared/gov/ai';
+import { hallSummary, rankHalls } from '@gcc/shared/gov/halls';
 import { getAccessToken } from '../utils/http';
 
 const API = `${(import.meta.env?.VITE_API_URL ?? '').replace(/\/$/, '')}/api/v1/ai`;
@@ -91,3 +92,14 @@ export async function askCampusAssistant(question, context) {
 }
 
 export { ASSISTANT_FALLBACK };
+
+/* ------------------------------------------------------------------ */
+/* Hall recommendation                                                 */
+/* ------------------------------------------------------------------ */
+/** Best hall for the expected attendance: the API (model-written explanation when a key is set), else local ranking. */
+export async function recommendHalls(input, { requests = [] } = {}) {
+  const remote = await callApi('/halls', { ...input, attendance: Number(input.attendance) || 1 });
+  if (remote?.rankings) return { rankings: remote.rankings, summary: remote.summary, source: remote.engine === 'ai' ? 'ai-service' : 'rules' };
+  const rankings = rankHalls({ ...input, requests, ignoreId: input.requestId });
+  return { rankings, summary: hallSummary(rankings, input), source: 'local' };
+}

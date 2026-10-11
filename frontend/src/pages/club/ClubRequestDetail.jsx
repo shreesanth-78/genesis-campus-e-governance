@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { HallBadge } from '../../components/gov/HallPermission';
 import { Card } from '../../components/gov/Common';
 import { OnlineBadge, PhysicalBadge, PromoStatus, RequestStatus } from '../../components/gov/Badges';
 import Modal from '../../components/gov/Modal';
@@ -10,7 +11,7 @@ import { EmptyState, Icon } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useGov } from '../../context/GovContext';
 import { ownsClub } from '../../store/permissions';
-import { fmtDate, fmtDateTime, getClubFrom, getRequest } from '../../store/selectors';
+import { fmtDate, fmtDateTime, getClubFrom, getRequest, hallOf } from '../../store/selectors';
 
 export default function ClubRequestDetail() {
   const { id } = useParams();
@@ -59,6 +60,9 @@ export default function ClubRequestDetail() {
           {r.status !== 'draft' && (
             <Card title="Review status">
               <dl className="space-y-3 text-xs">
+                <div className="flex items-center justify-between"><dt className="font-semibold text-ink-soft">Hall</dt><dd><HallBadge status={hallOf(r).status} /></dd></div>
+                {hallOf(r).requestedVenue && hallOf(r).requestedVenue !== r.venue && <div className="rounded-xl bg-brand-50 px-3 py-2 text-[11px] text-brand-800">The Events Section assigned <b>{r.venue}</b> instead of {hallOf(r).requestedVenue}{hallOf(r).note ? ` (“${hallOf(r).note}”)` : ''}.</div>}
+                {hallOf(r).status === 'rejected' && <div className="rounded-xl bg-rose-soft px-3 py-2 text-[11px] text-rose-ink">The hall could not be approved: {hallOf(r).note}. Choose another hall and resubmit.</div>}
                 <div className="flex items-center justify-between"><dt className="font-semibold text-ink-soft">Online review</dt><dd><OnlineBadge status={r.onlineReview.status} /></dd></div>
                 <div className="flex items-center justify-between"><dt className="font-semibold text-ink-soft">Hard-copy letter</dt><dd><PhysicalBadge status={r.physical.status} /></dd></div>
                 {r.physical.status === 'verified' && <div className="rounded-xl bg-canvas px-3 py-2 text-[11px] text-ink-soft">Ref {r.physical.refNo} · received {r.physical.receivedOn ? fmtDate(r.physical.receivedOn) : '—'}</div>}

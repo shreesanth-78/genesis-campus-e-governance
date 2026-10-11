@@ -20,6 +20,7 @@ export const ROLE_LABELS = {
 const RULES = {
   'request.review': ['events', 'osa'], // online review of documents/details
   'request.physical': ['events', 'osa'], // record hard-copy letter verification
+  'request.hall': ['events', 'osa'], // give permission for the hall the club asked for (or assign another)
   'request.approve': ['osa'], // FINAL approval: OSA only
   'request.publish': ['events', 'osa'],
   'promotion.review': ['events', 'osa'],

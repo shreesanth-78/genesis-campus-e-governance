@@ -27,11 +27,13 @@ GENESIS Campus Connect is one web portal with three entry points (**Student**, *
 
 ```mermaid
 flowchart LR
-    A[Club submits request<br/>poster + documents] --> B[Events Section<br/>online review]
+    A[Club submits request<br/>poster, documents, hall<br/>chosen with AI help] --> H[Events Section<br/>hall permission]
+    H --> B[Events Section<br/>online review]
     B --> C[Events Section<br/>hard-copy letter check]
     C --> D[OSA<br/>final approval]
     D --> E[Events Section or OSA<br/>publish]
     E --> F[Students see the event,<br/>get a catchy notification,<br/>register for a seat]
+    H -. hall not approved .-> A
     B -. corrections .-> A
     D -. reject with reason .-> A
 ```
@@ -99,11 +101,11 @@ Dashboard with countdowns · explore and search events with live seat counts · 
 
 ### Club Authority portal
 
-Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning, venue-clash and capacity warnings · five-step tracker, feedback and **version history on resubmission** · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
+Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning, **a hall picker that sorts every hall by how well it fits the number of people you expect (with an AI recommendation)**, venue-clash and capacity warnings · five-step tracker, feedback and **version history on resubmission** · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
 
 ### Events Section
 
-Review queue with filters · online review (clear, request corrections, reject with a mandatory reason) · **separate hard-copy letter verification** with date and reference number · publish and notify students · promotion review · club applications (view and AI check) · club directory · reports and audit trail.
+Review queue with filters · **hall permission** (approve the hall the club asked for, assign a different one that fits and is free, or send the request back with a reason) · online review (clear, request corrections, reject with a mandatory reason) · **separate hard-copy letter verification** with date and reference number · publish and notify students · promotion review · club applications (view and AI check) · club directory · reports and audit trail.
 
 ### OSA
 
@@ -156,7 +158,11 @@ When an event is published, students get a notification written to be tapped, in
 
 The model line is cleaned (no links, emojis or markdown, one sentence), rejected if it is a refusal, and replaced by a static category quote if the model is slow or down, so a notification always goes out. Registration confirmations ("You're in! 🎉") use fixed copy.
 
-### 5.3 Duplicate-club check
+### 5.3 Hall recommendation
+
+When a club fills the request form, the hall picker shows every hall with its capacity, facilities and a live **fit** label for the number of people the club expects: _Good fit_, _Comfortable_, _Almost full_, _Much larger than needed_, _Too small_, or _Already requested_ at that time. Pressing **Recommend a hall** asks the AI: the server ranks the halls (capacity fit, whether the hall is free at that date and time, and which kind of hall suits the event: labs for workshops, a sports hall for sports, a stage for cultural evenings), and the model writes a two-sentence explanation from that ranked data only. Without a key the same ranking comes with a rule-based explanation. A club only ever learns that a hall is taken, never which other club's event is in it. The recommendation is advisory: the **Events Section (or OSA) gives the permission**, and the online review and final approval cannot be completed until the hall is approved.
+
+### 5.4 Duplicate-club check
 
 When a new club applies, the server compares it with existing clubs (name, objectives, category) and gives OSA a similarity score and reasons, so overlapping clubs are caught before approval.
 
@@ -225,12 +231,12 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 
 ## 9. Quality and testing
 
-| Suite                                                                                                        | Tests | Status |
-| ------------------------------------------------------------------------------------------------------------ | ----- | ------ |
-| Shared: workflow engine, notification copy, permissions                                                      | 19    | pass   |
-| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, Groq client | 65    | pass   |
-| Frontend screens against an in-memory API running the real engine                                            | 14    | pass   |
-| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                | 32    | pass   |
+| Suite                                                                                                                     | Tests | Status |
+| ------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
+| Shared: workflow engine, hall ranking and permission, notification copy, permissions                                      | 30    | pass   |
+| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 75    | pass   |
+| Frontend screens against an in-memory API running the real engine                                                         | 17    | pass   |
+| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 34    | pass   |
 
 Highlights: the full approval path through four roles, the Events Section being refused final approval **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
 

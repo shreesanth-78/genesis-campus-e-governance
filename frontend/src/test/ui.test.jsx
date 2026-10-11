@@ -121,8 +121,8 @@ describe('club submits a new request', () => {
     await setVal(/Event date/, '2026-10-28');
     await setVal(/Starts/, '17:00');
     await setVal(/Ends/, '20:00');
-    await user.selectOptions(document.getElementById('rf-venue'), 'Seminar Room 3 (holds 45)');
     await setVal(/Expected attendance/, '40');
+    await user.click(screen.getByRole('radio', { name: /Seminar Room 3/ }));
     await setVal(/Registration closes/, '2026-10-25');
     const png = new File([new Uint8Array(2000)], 'poster.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Event poster'), png);
@@ -140,6 +140,48 @@ describe('club submits a new request', () => {
     mount('STU2026001', '/student/events');
     await screen.findAllByText(/Explore/i);
     expect(screen.queryByText('Prototype Showcase Night')).toBeNull();
+  });
+});
+
+describe('hall selection and permission', () => {
+  it('sorts the halls for the expected crowd, recommends one, and lets the club pick it', async () => {
+    const user = userEvent.setup();
+    mount('CLUB001', '/club/requests/new');
+    const attendance = await screen.findByLabelText(/Expected attendance/);
+    await user.type(attendance, '50');
+    const radios = screen.getAllByRole('radio');
+    expect(radios[0].getAttribute('aria-label')).toMatch(/Innovation Lab/); // the best fit for 50 people comes first
+    expect(screen.getByText('Too small')).toBeTruthy(); // Seminar Room 3 holds 45
+    await user.click(screen.getByRole('button', { name: /Recommend a hall/ }));
+    expect(await screen.findByText(/Innovation Lab is the best fit/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Use Innovation Lab/ }));
+    expect(screen.getByRole('radio', { name: /Innovation Lab/ }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('the Events Section approves the hall before it can clear the online review; a club sees the decision', async () => {
+    const user = userEvent.setup();
+    mount('EVT001', '/admin/events/requests/REQ-1251');
+    const clear = await screen.findByRole('button', { name: /Clear online review/ });
+    expect(clear.disabled).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Approve hall' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Clear online review/ }).disabled).toBe(false));
+
+    mount('CLUB001', '/club/requests/REQ-1251');
+    expect((await screen.findAllByText('Hall approved')).length).toBeGreaterThan(0);
+  });
+
+  it('a reassigned hall is shown to the club, and a hall that cannot be used sends the request back', async () => {
+    const user = userEvent.setup();
+    mount('EVT001', '/admin/events/requests/REQ-1251');
+    await user.click(await screen.findByRole('button', { name: 'Assign a different hall' }));
+    await user.selectOptions(await screen.findByLabelText(/New hall/), 'Main Auditorium (holds 600, much larger than needed)');
+    await user.click(screen.getByRole('button', { name: 'Assign hall' }));
+    mount('CLUB001', '/club/requests/REQ-1251');
+    expect(await screen.findByText(/assigned/)).toBeTruthy();
+    expect(screen.getAllByText(/Main Auditorium/).length).toBeGreaterThan(0);
+
+    mount('EVT001', '/admin/events/requests/REQ-1262');
+    expect((await screen.findAllByText(/Pitch Practice Night/)).length).toBeGreaterThan(0);
   });
 });
 

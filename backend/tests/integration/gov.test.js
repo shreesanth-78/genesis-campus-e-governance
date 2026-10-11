@@ -196,6 +196,12 @@ describe('the approval path is enforced on the server', () => {
     let seen = (await student.get('/gov/state')).body.data;
     expect(seen.requests.find((r) => r.id === id)).toBeUndefined();
 
+    // the online review cannot be cleared before the hall is approved
+    const blocked = await events.act('reviewRequest', id, { decision: 'clear' });
+    expect(blocked.body.data.error).toMatch(/permission for the requested hall/);
+    expect((await events.act('reviewHall', id, { decision: 'approve', note: 'Free.' })).body.data.ok).toBe(
+      true,
+    );
     expect(
       (await events.act('reviewRequest', id, { decision: 'clear', note: 'Complete.' })).body.data.ok,
     ).toBe(true);
@@ -798,6 +804,7 @@ describe('publishing writes an event-specific quote with the chat model', () => 
     const id = (
       await act(club, 'saveRequest', goodRequest({ title, category: 'Hackathon' }), { submit: true })
     ).body.data.extra.id;
+    await act(events, 'reviewHall', id, { decision: 'approve' });
     await act(events, 'reviewRequest', id, { decision: 'clear' });
     await act(events, 'recordPhysical', id, {
       status: 'verified',

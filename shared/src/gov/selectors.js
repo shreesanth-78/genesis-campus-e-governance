@@ -121,6 +121,20 @@ export function clubMembers(state, clubId) {
 export const getRequest = (state, id) => state.requests.find((r) => r.id === id) || null;
 export const requestsForClub = (state, clubId) => state.requests.filter((r) => r.clubId === clubId);
 
+/** The hall permission of a request. Older records without one count as approved once reviewed. */
+export const hallOf = (r) =>
+  r.hall ?? {
+    status:
+      r.onlineReview?.status === 'cleared' || ['approved', 'published', 'completed'].includes(r.status)
+        ? 'approved'
+        : 'pending',
+    by: null,
+    at: null,
+    note: '',
+    requestedVenue: r.venue,
+  };
+export const hallStatus = (r) => hallOf(r).status;
+
 export const needsOnlineReview = (r) => r.status === 'submitted' && r.onlineReview.status === 'pending';
 export const needsPhysical = (r) => r.status === 'submitted' && r.physical.status !== 'verified';
 export const readyForApproval = (r) =>
@@ -291,6 +305,7 @@ export function adminStats(state) {
   const live = r.filter((x) => !['completed'].includes(x.status));
   return {
     pendingOnline: r.filter(needsOnlineReview).length,
+    awaitingHall: r.filter((x) => x.status === 'submitted' && hallStatus(x) !== 'approved').length,
     awaitingPhysical: r.filter(needsPhysical).length,
     readyForApproval: r.filter(readyForApproval).length,
     readyToPublish: r.filter(readyToPublish).length,

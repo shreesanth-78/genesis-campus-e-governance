@@ -211,3 +211,31 @@ filesRouter.get(
     res.send(buffer);
   }),
 );
+
+// Hall recommendation for a club (and for the reviewers who can reassign a hall).
+aiRouter.post(
+  '/halls',
+  auth,
+  onlyPortals('club', 'osa', 'events'),
+  validate({
+    body: z.object({
+      attendance: z.coerce.number().int().min(1).max(5000),
+      date: z.string().max(10).optional(),
+      startTime: z.string().max(5).optional(),
+      endTime: z.string().max(5).optional(),
+      category: z.string().max(40).optional(),
+      requestId: z.string().max(30).optional(),
+    }),
+  }),
+  wrap(async (req, res) => {
+    const portal = await portalFor(req);
+    res.json({
+      data: await ai.hallAdvice(
+        db(req),
+        req.user,
+        { portal, actor: req.actor, input: req.body },
+        { llm: llmFor(req) },
+      ),
+    });
+  }),
+);

@@ -5,8 +5,17 @@
 // State is never mutated. Permission checks live here (not only in the UI),
 // so the rules are enforced no matter which component calls them.
 
-import { CLUB_APP_DOCS, REQUEST_DOCS } from './govData.js';
-import { TODAY_ISO, allClubs, fmtDate, fmtDateTime, fmt12, initialsOf } from './selectors.js';
+import { CLUB_APP_DOCS, REQUEST_DOCS, VENUES } from './govData.js';
+import {
+  TODAY_ISO,
+  allClubs,
+  findConflicts,
+  fmtDate,
+  fmtDateTime,
+  fmt12,
+  hallOf,
+  initialsOf,
+} from './selectors.js';
 import { newEventNotice } from './copy.js';
 import { actorKey, can, deniedReason, ownsClub } from './permissions.js';
 
@@ -150,6 +159,10 @@ export function saveRequest(state, actor, data, { submit = false, id = null } = 
       status: submit ? 'submitted' : r.status,
       version: resubmitting ? r.version + 1 : r.version,
       submittedAt: submit ? at : r.submittedAt,
+      hall:
+        hallOf(r).status === 'approved' && r.venue === fields.venue
+          ? hallOf(r)
+          : { status: 'pending', by: null, at: null, note: '', requestedVenue: fields.venue },
       onlineReview: resubmitting ? { status: 'pending', by: null, at: null, note: '' } : r.onlineReview,
       physical:
         resubmitting && r.physical.status === 'issue'
@@ -187,6 +200,7 @@ export function saveRequest(state, actor, data, { submit = false, id = null } = 
     clubId: actor.clubId,
     ...fields,
     status: submit ? 'submitted' : 'draft',
+    hall: { status: 'pending', by: null, at: null, note: '', requestedVenue: fields.venue },
     onlineReview: { status: 'pending', by: null, at: null, note: '' },
     physical: { status: 'pending', by: null, at: null, receivedOn: null, refNo: '', note: '' },
     approval: null,
@@ -230,6 +244,8 @@ export function reviewRequest(state, actor, id, { decision, reasons = [], note =
 
   if (decision === 'clear') {
     if (cur.onlineReview.status === 'cleared') return fail(state, 'Online review is already cleared.');
+    if (hallOf(cur).status !== 'approved')
+      return fail(state, 'Give permission for the requested hall before clearing the online review.');
     next = mapRequest(next, id, (r) => ({
       ...r,
       onlineReview: { status: 'cleared', by: actor.name, at, note },
@@ -281,6 +297,69 @@ export function reviewRequest(state, actor, id, { decision, reasons = [], note =
   return fail(state, 'Unknown decision.');
 }
 
+/**
+ * Permission for the hall the club asked for. decision:
+ *  - 'approve'  the requested hall is fine;
+ *  - 'reassign' give the club a different hall (it must hold the expected attendance and be free);
+ *  - 'reject'   the hall cannot be used: the request goes back to the club for corrections (a reason is required).
+ */
+export function reviewHall(state, actor, id, { decision, venue = '', note = '' }) {
+  if (!can(actor, 'request.hall')) return fail(state, deniedReason('request.hall'));
+  const cur = state.requests.find((r) => r.id === id);
+  if (!cur) return fail(state, 'Request not found.');
+  if (cur.status !== 'submitted') return fail(state, 'The hall can only be decided for submitted requests.');
+  if (!['approve', 'reassign', 'reject'].includes(decision)) return fail(state, 'Unknown decision.');
+  const at = tick(state);
+  const requested = hallOf(cur).requestedVenue || cur.venue;
+
+  if (decision === 'reject') {
+    if (!note.trim()) return fail(state, 'Tell the club why the hall cannot be used.');
+    const sent = reviewRequest(state, actor, id, {
+      decision: 'correction',
+      reasons: ['Hall not approved'],
+      note,
+    });
+    if (!sent.ok) return sent;
+    const next = mapRequest(sent.state, id, (r) => ({
+      ...r,
+      hall: { status: 'rejected', by: actor.name, at, note, requestedVenue: requested },
+      history: [...r.history, entry(at, actor, 'Hall not approved', `${r.venue}: ${note}`)],
+    }));
+    return ok(next);
+  }
+
+  let assigned = cur.venue;
+  if (decision === 'reassign') {
+    const v = VENUES.find((x) => x.name === venue);
+    if (!v) return fail(state, 'Choose one of the listed halls.');
+    if (v.name === cur.venue) return fail(state, 'That is already the requested hall. Use Approve.');
+    if (v.capacity < cur.capacity)
+      return fail(state, `${v.name} holds ${v.capacity}, fewer than the ${cur.capacity} expected.`);
+    if (findConflicts(state, { ...cur, venue: v.name }).length)
+      return fail(state, `${v.name} is already requested at an overlapping time.`);
+    assigned = v.name;
+  }
+  const label = decision === 'approve' ? 'Hall approved' : 'Hall changed';
+  const detail = decision === 'approve' ? cur.venue : `${requested} -> ${assigned}${note ? `: ${note}` : ''}`;
+  let next = mapRequest({ ...state, clock: at }, id, (r) => ({
+    ...r,
+    venue: assigned,
+    hall: { status: 'approved', by: actor.name, at, note, requestedVenue: requested },
+    history: [...r.history, entry(at, actor, label, detail)],
+  }));
+  const what =
+    decision === 'approve'
+      ? `approved the hall for “${cur.title}”`
+      : `assigned ${assigned} to “${cur.title}”`;
+  next = withActivity(next, at, actor, what, {
+    kind: 'request',
+    refType: 'request',
+    refId: id,
+    clubId: cur.clubId,
+  });
+  return ok(next);
+}
+
 /** Hard-copy letter verification — recorded separately from the online review. */
 export function recordPhysical(state, actor, id, { status, receivedOn = '', refNo = '', note = '' }) {
   if (!can(actor, 'request.physical')) return fail(state, deniedReason('request.physical'));
@@ -326,6 +405,8 @@ export function finalApprove(state, actor, id, { note = '' } = {}) {
     return fail(state, 'Online review must be cleared before final approval.');
   if (cur.physical.status !== 'verified')
     return fail(state, 'The hard-copy letter must be verified before final approval.');
+  if (hallOf(cur).status !== 'approved')
+    return fail(state, 'The hall must be approved before final approval.');
   const at = tick(state);
   let next = mapRequest({ ...state, clock: at }, id, (r) => ({
     ...r,
