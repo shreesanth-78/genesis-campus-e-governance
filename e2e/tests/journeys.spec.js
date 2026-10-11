@@ -773,6 +773,25 @@ test.describe('E2E-11 club space', () => {
     expect(r).toBe(403);
     for (const c of [student, authority, other]) await c.context.close();
   });
+
+  test('the authority can make the space announcement-only and open it again', async ({ browser }) => {
+    const authority = await as(browser, 'club', /Google Developer Student Clubs/);
+    await authority.page.goto('/club/space');
+    await authority.page.getByRole('switch', { name: 'Only the club authority can post' }).click();
+    await expect(
+      authority.page.getByRole('switch', { name: 'Only the club authority can post' }),
+    ).toHaveAttribute('aria-checked', 'true');
+
+    const student = await as(browser, 'student', /Good (morning|afternoon|evening), Arjun/);
+    await student.page.goto('/student/club-space?club=innovation');
+    await expect(student.page.getByText(/Only the club authority can post in this space/)).toBeVisible();
+    await expect(student.page.getByLabel('Write a message')).toHaveCount(0);
+
+    await authority.page.getByRole('switch', { name: 'Only the club authority can post' }).click();
+    await student.page.reload();
+    await expect(student.page.getByLabel('Write a message')).toBeVisible();
+    for (const c of [authority, student]) await c.context.close();
+  });
 });
 
 test.describe('E2E-06 demo reset (kept last: it restores the sample data)', () => {

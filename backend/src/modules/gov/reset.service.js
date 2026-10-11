@@ -19,6 +19,7 @@ export async function resetDemoData(db) {
     await trx('gov_registrations').del();
     await trx('gov_club_posts').del();
     await trx('gov_club_members').del();
+    await trx('gov_club_settings').del();
     await trx('gov_user_state').del();
     await trx('gov_docs').del();
     await trx('gov_meta').del();

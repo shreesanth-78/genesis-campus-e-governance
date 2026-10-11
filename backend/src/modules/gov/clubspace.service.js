@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { selectors } from '@gcc/shared/gov';
-import { toDb } from '../../db/helpers.js';
+import { boolFromDb, boolToDb, toDb } from '../../db/helpers.js';
 import { clock } from '../../lib/clock.js';
 import { errors } from '../../lib/errors.js';
 import { loadState } from './state.js';
@@ -37,6 +37,43 @@ const cleanBody = (text) =>
     .replace(/\r\n/g, '\n')
     .trim();
 
+// ---------- Settings (set by the club authority) ----------
+
+const DEFAULTS = { membersCanPost: true, joinOpen: true };
+
+export async function settingsOf(db, clubId) {
+  const row = await db('gov_club_settings').where({ club_id: clubId }).first();
+  return row
+    ? { membersCanPost: boolFromDb(row.members_can_post), joinOpen: boolFromDb(row.join_open) }
+    : { ...DEFAULTS };
+}
+
+/** Clubs that are not taking new members right now (students see this before pressing Join). */
+export async function closedClubs(db) {
+  const rows = await db('gov_club_settings')
+    .where({ join_open: boolToDb(false) })
+    .select('club_id');
+  return rows.map((r) => r.club_id);
+}
+
+export async function updateSettings(db, ctx, clubId, patch) {
+  const { authority } = await access(db, ctx, clubId);
+  if (!authority) throw errors.forbidden('Only the club authority changes these settings.');
+  const next = { ...(await settingsOf(db, clubId)) };
+  if (typeof patch.membersCanPost === 'boolean') next.membersCanPost = patch.membersCanPost;
+  if (typeof patch.joinOpen === 'boolean') next.joinOpen = patch.joinOpen;
+  await db('gov_club_settings')
+    .insert({
+      club_id: clubId,
+      members_can_post: boolToDb(next.membersCanPost),
+      join_open: boolToDb(next.joinOpen),
+      updated_at: toDb(clock.now()),
+    })
+    .onConflict('club_id')
+    .merge();
+  return next;
+}
+
 // ---------- Joining ----------
 
 export async function membershipsOf(db, user) {
@@ -46,6 +83,9 @@ export async function membershipsOf(db, user) {
 
 export async function join(db, user, clubId) {
   await clubOf(db, clubId);
+  const already = await db('gov_club_members').where({ club_id: clubId, user_id: user.id }).first();
+  if (!already && !(await settingsOf(db, clubId)).joinOpen)
+    throw errors.forbidden('This club is not taking new members right now.');
   await db('gov_club_members')
     .insert({ club_id: clubId, user_id: user.id, joined_at: toDb(clock.now()) })
     .onConflict(['club_id', 'user_id'])
@@ -103,6 +143,7 @@ export async function space(db, ctx, clubId) {
   return {
     club: { id: club.id, name: club.name },
     canAnnounce: authority,
+    settings: await settingsOf(db, clubId),
     memberCount: Number(n),
     events,
     posts: rows.reverse().map((r) => shape(r, ctx.user.id, authority)),
@@ -116,6 +157,8 @@ export async function post(db, ctx, clubId, { kind, body, eventId }) {
   if (text.length > MAX_BODY) throw errors.validation(`Keep a post under ${MAX_BODY} characters.`);
   if (kind === 'announcement' && !authority)
     throw errors.forbidden('Only the club authority posts announcements.');
+  if (!authority && !(await settingsOf(db, clubId)).membersCanPost)
+    throw errors.forbidden('Only the club authority can post in this space right now.');
   if (eventId) {
     const state = await loadState(db);
     const known = state.requests.some((r) => r.id === eventId && r.clubId === clubId && r.status !== 'draft');

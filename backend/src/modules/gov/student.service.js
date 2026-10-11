@@ -4,7 +4,7 @@ import { clock } from '../../lib/clock.js';
 import { errors } from '../../lib/errors.js';
 import { loadState, lockState } from './state.js';
 import { registrationCounts } from './gov.service.js';
-import { membershipsOf } from './clubspace.service.js';
+import { closedClubs, membershipsOf } from './clubspace.service.js';
 
 const DEMO_TODAY = '2026-10-10';
 const blank = () => ({ favorites: [], bookmarks: [], notifications: [], prefs: EMPTY_PREFS, history: [] });
@@ -87,6 +87,7 @@ export async function getStudent(db, user) {
     ...doc,
     registrations: await registrationsOf(db, user.id),
     memberships: await membershipsOf(db, user),
+    closedClubs: await closedClubs(db),
   };
 }
 

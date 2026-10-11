@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Icon } from './ui';
+import { Icon, Toggle } from './ui';
 import { Field, Select, Textarea } from './gov/Form';
 import { Card } from './gov/Common';
-import { deleteClubPost, fetchClubMembers, fetchClubSpace, postToClub, removeClubMember } from '../utils/api';
+import { deleteClubPost, fetchClubMembers, fetchClubSpace, postToClub, removeClubMember, saveClubSettings } from '../utils/api';
 import { cn } from '../utils/helpers';
 
 const POLL_MS = 10000;
@@ -79,6 +79,16 @@ export default function ClubSpace({ clubId, authority = false, onError }) {
     }
   };
 
+  const changeSetting = async (patch) => {
+    try {
+      const settings = await saveClubSettings(clubId, patch);
+      setData((d) => ({ ...d, settings }));
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Could not save that setting.');
+    }
+  };
+
   const remove = async (id) => {
     try {
       await deleteClubPost(clubId, id);
@@ -108,6 +118,7 @@ export default function ClubSpace({ clubId, authority = false, onError }) {
   }
 
   const titleOf = (id) => data.events.find((e) => e.id === id)?.title;
+  const readOnly = !authority && !data.settings.membersCanPost;
   const posts = data.posts.filter((p) => filter === 'all' || p.kind === filter);
 
   return (
@@ -167,6 +178,14 @@ export default function ClubSpace({ clubId, authority = false, onError }) {
           <li ref={end} aria-hidden="true" />
         </ul>
 
+        {readOnly ? (
+          <div className="border-t border-line px-5 py-4">
+            {error && <p role="alert" className="mb-3 rounded-xl bg-rose-soft px-3 py-2 text-[11px] text-rose-ink">{error}</p>}
+            <p className="flex items-start gap-2 rounded-xl bg-canvas px-4 py-3 text-[11px] text-ink-soft">
+              <Icon name="Lock" className="mt-0.5 h-4 w-4 shrink-0" /> Only the club authority can post in this space right now. You can read everything here.
+            </p>
+          </div>
+        ) : (
         <div className="space-y-3 border-t border-line px-5 py-4">
           {error && (
             <p role="alert" className="rounded-xl bg-rose-soft px-3 py-2 text-[11px] text-rose-ink">
@@ -200,6 +219,7 @@ export default function ClubSpace({ clubId, authority = false, onError }) {
             </button>
           </div>
         </div>
+        )}
       </Card>
 
       <div className="space-y-6">
@@ -210,6 +230,26 @@ export default function ClubSpace({ clubId, authority = false, onError }) {
             <li>Keep it about the club. The authority can delete any post, and you can delete your own.</li>
           </ul>
         </Card>
+        {authority && (
+          <Card title="Space settings" subtitle="Only you can change these">
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3">
+                <div className="min-w-0 flex-1 text-[11px] leading-snug text-ink-soft">
+                  <b className="block text-xs text-brand-900">Only I can post</b>
+                  Members can read, but only you post. Turn it off to let members write too.
+                </div>
+                <Toggle checked={!data.settings.membersCanPost} onChange={(on) => changeSetting({ membersCanPost: !on })} label="Only the club authority can post" />
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="min-w-0 flex-1 text-[11px] leading-snug text-ink-soft">
+                  <b className="block text-xs text-brand-900">Close to new members</b>
+                  Students can no longer join. Current members stay.
+                </div>
+                <Toggle checked={!data.settings.joinOpen} onChange={(on) => changeSetting({ joinOpen: !on })} label="Close the club to new members" />
+              </li>
+            </ul>
+          </Card>
+        )}
         {authority && (
           <Card title="Members who joined" subtitle={`${members.length} in the portal`}>
             {members.length === 0 ? (

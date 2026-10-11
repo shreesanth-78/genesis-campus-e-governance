@@ -28,6 +28,11 @@ async function session(userId) {
         .post(`${BASE}${p}`)
         .set(h)
         .send(body ?? {}),
+    put: (p, body) =>
+      request(app)
+        .put(`${BASE}${p}`)
+        .set(h)
+        .send(body ?? {}),
     del: (p) => request(app).delete(`${BASE}${p}`).set(h),
   };
 }
@@ -179,5 +184,67 @@ describe('the club space', () => {
     expect(list[0]).toMatchObject({ name: 'Arjun Kumar', userId: 'STU2026001' });
     expect((await club.del(`/gov/clubs/innovation/members/${list[0].id}`)).status).toBe(200);
     expect((await student.get('/gov/clubs/innovation/space')).status).toBe(403); // no longer a member
+  });
+});
+
+describe('club space settings', () => {
+  it('lets the authority make the space announcement-only; members can still read', async () => {
+    const student = await session('STU2026001');
+    const club = await session('CLUB001');
+    expect((await student.get('/gov/clubs/innovation/space')).body.data.settings).toEqual({
+      membersCanPost: true,
+      joinOpen: true,
+    });
+    expect((await student.put('/gov/clubs/innovation/settings', { membersCanPost: false })).status).toBe(403);
+
+    const set = await club.put('/gov/clubs/innovation/settings', { membersCanPost: false });
+    expect(set.status).toBe(200);
+    expect(set.body.data).toEqual({ membersCanPost: false, joinOpen: true });
+
+    const refused = await student.post('/gov/clubs/innovation/posts', { kind: 'discussion', body: 'hello' });
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.message).toMatch(/Only the club authority can post/);
+    expect((await student.get('/gov/clubs/innovation/space')).status).toBe(200); // still readable
+    expect(
+      (await club.post('/gov/clubs/innovation/posts', { kind: 'announcement', body: 'Only I can talk.' }))
+        .status,
+    ).toBe(201);
+    expect(
+      (await club.post('/gov/clubs/innovation/posts', { kind: 'discussion', body: 'And I can chat.' }))
+        .status,
+    ).toBe(201);
+
+    await club.put('/gov/clubs/innovation/settings', { membersCanPost: true });
+    expect(
+      (await student.post('/gov/clubs/innovation/posts', { kind: 'discussion', body: 'back on' })).status,
+    ).toBe(201);
+  });
+
+  it('lets the authority close a club to new members without removing the ones it has', async () => {
+    const student = await session('STU2026001');
+    const robotics = await session('CLUB002');
+    const other = await session('CLUB001');
+    expect((await other.put('/gov/clubs/robotics/settings', { joinOpen: false })).status).toBe(403); // not their club
+    await student.post('/gov/student/memberships', { clubId: 'robotics' });
+    expect((await robotics.put('/gov/clubs/robotics/settings', { joinOpen: false })).body.data.joinOpen).toBe(
+      false,
+    );
+
+    const me = (await student.get('/gov/student')).body.data;
+    expect(me.closedClubs).toEqual(['robotics']);
+    expect(me.memberships).toContain('robotics'); // the existing member stays
+    expect((await student.get('/gov/clubs/robotics/space')).status).toBe(200);
+
+    await student.del('/gov/student/memberships/robotics');
+    const closed = await student.post('/gov/student/memberships', { clubId: 'robotics' });
+    expect(closed.status).toBe(403);
+    expect(closed.body.error.message).toMatch(/not taking new members/);
+    await robotics.put('/gov/clubs/robotics/settings', { joinOpen: true });
+    expect((await student.post('/gov/student/memberships', { clubId: 'robotics' })).status).toBe(201);
+  });
+
+  it('only accepts true or false', async () => {
+    const club = await session('CLUB001');
+    expect((await club.put('/gov/clubs/innovation/settings', { membersCanPost: 'no' })).status).toBe(400);
   });
 });

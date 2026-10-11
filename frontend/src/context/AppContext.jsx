@@ -25,6 +25,7 @@ const BLANK = {
   favorites: [],
   bookmarks: [],
   memberships: [],
+  closedClubs: [],
   notifications: [],
   history: [],
   prefs: { inApp: true, email: false, deadlines: true, news: true, interests: [] },
@@ -40,7 +41,8 @@ export function AppProvider({ children }) {
   const [confirmation, setConfirmation] = useState(null); // event shown in the success modal
   const busy = useRef(0);
 
-  const { registrations, favorites, bookmarks, memberships, notifications, prefs, history } = data;
+  const { registrations, favorites, bookmarks, memberships, closedClubs, notifications, prefs, history } =
+    data;
 
   const notify = useCallback((message, tone = 'success') => setToast({ message, tone, id: Date.now() }), []);
 
@@ -255,6 +257,7 @@ export function AppProvider({ children }) {
     favorites,
     bookmarks,
     memberships,
+    closedClubs,
     joinClub,
     leaveClub,
     notifications,

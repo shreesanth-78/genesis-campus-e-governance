@@ -111,7 +111,7 @@ Dashboard with countdowns · **Club Space** (join a club, then read its announce
 
 ### Club Authority portal
 
-Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning · tracker, feedback and **version history on resubmission** · **Club Space**: post highlighted announcements, join the discussion, see and remove members · **circulate an approved event** and watch the registrations · **request a hall for the registered crowd**, with halls sorted by fit, an AI recommendation and a priority · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
+Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning · tracker, feedback and **version history on resubmission** · **Club Space**: post highlighted announcements, join the discussion, see and remove members, and use **space settings** (make it _only I can post_ so members just read, or close the club to new members) · **circulate an approved event** and watch the registrations · **request a hall for the registered crowd**, with halls sorted by fit, an AI recommendation and a priority · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
 
 ### OSA
 
@@ -244,9 +244,9 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 | Suite                                                                                                                     | Tests | Status |
 | ------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Shared: workflow engine, hall ranking and permission, notification copy, permissions                                      | 35    | pass   |
-| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 87    | pass   |
-| Frontend screens against an in-memory API running the real engine                                                         | 21    | pass   |
-| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 39    | pass   |
+| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 90    | pass   |
+| Frontend screens against an in-memory API running the real engine                                                         | 23    | pass   |
+| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 40    | pass   |
 
 Highlights: the full approval path through four roles, the Events Section being refused any review or approval step **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
 

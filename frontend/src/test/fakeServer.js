@@ -26,6 +26,8 @@ export function createFakeServer() {
   let posts = []; // club space posts
   let seq = 0;
   const clubsOf = (id) => (joined[id] ??= ['innovation']);
+  const cfg = {}; // club id -> { membersCanPost, joinOpen }
+  const settingsOf = (id) => (cfg[id] ??= { membersCanPost: true, joinOpen: true });
 
   const portalOf = (u) => (u.role === 'admin' ? u.adminType : u.role);
   const actorOf = ({ password: _p, ...u }) => ({ ...u, id: u.userId });
@@ -86,6 +88,13 @@ export function createFakeServer() {
       return json({ ok, error: ok ? undefined : error, extra, state: view(session.portal, actor) });
     }
     // ---- club space ----
+    const settingsMatch = path.match(/^\/gov\/clubs\/([^/]+)\/settings$/);
+    if (settingsMatch && method === 'PUT') {
+      if (!(session.portal === 'club' && actor.clubId === settingsMatch[1]))
+        return fail(403, 'FORBIDDEN', 'Only the club authority changes these settings.');
+      Object.assign(settingsOf(settingsMatch[1]), body);
+      return json(settingsOf(settingsMatch[1]));
+    }
     const spaceMatch = path.match(/^\/gov\/clubs\/([^/]+)\/(space|posts)(?:\/([^/]+))?$/);
     if (spaceMatch) {
       const [, clubId, part, postId] = spaceMatch;
@@ -104,6 +113,7 @@ export function createFakeServer() {
         return json({
           club: { id: clubId, name: club.name },
           canAnnounce: isAuthority,
+          settings: settingsOf(clubId),
           memberCount: Object.values(joined).filter((l) => l.includes(clubId)).length,
           events,
           posts: posts
@@ -118,6 +128,8 @@ export function createFakeServer() {
       if (method === 'POST') {
         if (body.kind === 'announcement' && !isAuthority)
           return fail(403, 'FORBIDDEN', 'Only the club authority posts announcements.');
+        if (!isAuthority && !settingsOf(clubId).membersCanPost)
+          return fail(403, 'FORBIDDEN', 'Only the club authority can post in this space right now.');
         if (!String(body.body ?? '').trim()) return fail(400, 'VALIDATION', 'Write something first.');
         const p = {
           id: `p${++seq}`,
@@ -154,6 +166,7 @@ export function createFakeServer() {
       const shape = () => ({
         ...mine,
         memberships: clubsOf(actor.userId),
+        closedClubs: Object.keys(cfg).filter((id) => !cfg[id].joinOpen),
         registrations: list.map((eventId) => ({
           eventId,
           ref: '',
@@ -179,6 +192,8 @@ export function createFakeServer() {
       }
       if (path === '/gov/student/memberships' && method === 'POST') {
         const l = clubsOf(actor.userId);
+        if (!l.includes(body.clubId) && !settingsOf(body.clubId).joinOpen)
+          return fail(403, 'FORBIDDEN', 'This club is not taking new members right now.');
         if (!l.includes(body.clubId)) l.push(body.clubId);
         return json(reply(), 201);
       }
@@ -232,6 +247,7 @@ export function createFakeServer() {
       Object.keys(students).forEach((k) => delete students[k]);
       Object.keys(regs).forEach((k) => delete regs[k]);
       Object.keys(joined).forEach((k) => delete joined[k]);
+      Object.keys(cfg).forEach((k) => delete cfg[k]);
       posts = [];
     },
     get state() {

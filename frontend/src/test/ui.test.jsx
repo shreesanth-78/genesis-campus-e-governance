@@ -279,6 +279,30 @@ describe('club space', () => {
     expect(await screen.findByText('Arena rehearsal moves to 5 PM.')).toBeTruthy();
   });
 
+  it('the authority can make the space announcement-only, and members can then only read', async () => {
+    const user = userEvent.setup();
+    mount('CLUB001', '/club/space');
+    await user.click(await screen.findByRole('switch', { name: 'Only the club authority can post' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Only the club authority can post' }).getAttribute('aria-checked')).toBe('true'));
+
+    mount('STU2026001', '/student/club-space?club=innovation');
+    expect(await screen.findByText(/Only the club authority can post in this space right now/)).toBeTruthy();
+    expect(screen.queryByLabelText('Write a message')).toBeNull();
+  });
+
+  it('closing a club to new members shows students a disabled join button', async () => {
+    const user = userEvent.setup();
+    mount('CLUB002', '/club/space');
+    await user.click(await screen.findByRole('switch', { name: 'Close the club to new members' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Close the club to new members' }).getAttribute('aria-checked')).toBe('true'));
+
+    mount('STU2026001', '/student/clubs');
+    const card = (await screen.findAllByText('Hut Labs'))[0].closest('article');
+    await user.click(within(card).getByRole('button', { name: /View club/ }));
+    const join = await screen.findByRole('button', { name: /Not taking members/ });
+    expect(join.disabled).toBe(true);
+  });
+
   it('shows an empty state with a way to find clubs when no club has been joined', async () => {
     const user = userEvent.setup();
     mount('STU2026001', '/student/club-space');

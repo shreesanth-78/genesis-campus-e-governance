@@ -158,6 +158,14 @@ govRouter.delete(
     res.json({ data: { removed: true } });
   }),
 );
+govRouter.put(
+  '/clubs/:clubId/settings',
+  auth,
+  validate({ body: z.object({ membersCanPost: z.boolean().optional(), joinOpen: z.boolean().optional() }) }),
+  wrap(async (req, res) =>
+    res.json({ data: await space.updateSettings(db(req), await spaceCtx(req), req.params.clubId, req.body) }),
+  ),
+);
 govRouter.get(
   '/clubs/:clubId/members',
   auth,

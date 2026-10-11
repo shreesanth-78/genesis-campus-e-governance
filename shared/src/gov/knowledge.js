@@ -365,7 +365,7 @@ export const PORTAL_FAQ = [
       'members',
       'group chat',
     ],
-    text: 'Club Space is a private board for each club. A student joins a club from the Clubs Directory (View club, then Join). The club then appears in the sidebar under Club Space. Only members and the club authority can see it: the authority posts highlighted announcements, and members discuss events and plans, optionally tagging a post to an event. People can delete their own posts and the authority can delete any. It replaces the WhatsApp group.',
+    text: 'Club Space is a private board for each club. A student joins a club from the Clubs Directory (View club, then Join). The club then appears in the sidebar under Club Space. Only members and the club authority can see it: the authority posts highlighted announcements, and members discuss events and plans, optionally tagging a post to an event. People can delete their own posts and the authority can delete any. The authority can set the space to announcement-only (only the authority posts, members read) and can close the club to new members. It replaces the WhatsApp group.',
   },
   {
     id: 'start-club',

@@ -7,12 +7,13 @@ import { useApp } from '../context/AppContext';
 
 export default function ClubModal({ club, onClose }) {
   const navigate = useNavigate();
-  const { favorites, toggleFavorite, memberships, joinClub, leaveClub } = useApp();
+  const { favorites, toggleFavorite, memberships, closedClubs, joinClub, leaveClub } = useApp();
   const { events: EVENTS } = useGov();
   if (!club) return null;
   const tone = CLUB_TONES[club.tone];
   const fav = favorites.includes(club.id);
   const member = memberships.includes(club.id);
+  const closed = closedClubs.includes(club.id);
   const events = EVENTS.filter((e) => e.clubId === club.id && e.status !== 'closed');
 
   return (
@@ -59,7 +60,7 @@ export default function ClubModal({ club, onClose }) {
                   <button onClick={() => leaveClub(club.id)} className="btn-ghost px-3 py-2 text-[11px]">Leave</button>
                 </div>
               ) : (
-                <button onClick={() => joinClub(club.id)} className="btn-primary px-3 py-2 text-[11px]"><Icon name="UserPlus" className="h-3.5 w-3.5" /> Join club</button>
+                <button onClick={() => joinClub(club.id)} disabled={closed} className="btn-primary px-3 py-2 text-[11px] disabled:opacity-50"><Icon name="UserPlus" className="h-3.5 w-3.5" /> {closed ? 'Not taking members' : 'Join club'}</button>
               )}
             </div>
           </div>

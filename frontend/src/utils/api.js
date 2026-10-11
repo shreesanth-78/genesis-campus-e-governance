@@ -62,6 +62,8 @@ export const postToClub = (clubId, body) =>
   api(`/gov/clubs/${encodeURIComponent(clubId)}/posts`, { method: 'POST', body });
 export const deleteClubPost = (clubId, postId) =>
   api(`/gov/clubs/${encodeURIComponent(clubId)}/posts/${encodeURIComponent(postId)}`, { method: 'DELETE' });
+export const saveClubSettings = (clubId, settings) =>
+  api(`/gov/clubs/${encodeURIComponent(clubId)}/settings`, { method: 'PUT', body: settings });
 export const fetchClubMembers = (clubId) => api(`/gov/clubs/${encodeURIComponent(clubId)}/members`);
 export const removeClubMember = (clubId, userId) =>
   api(`/gov/clubs/${encodeURIComponent(clubId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
