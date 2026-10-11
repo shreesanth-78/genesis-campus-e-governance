@@ -9,6 +9,12 @@
     -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3 { letter-spacing: -0.03em; }
+  /* Responsive safety net: a grid with no explicit columns would size its single column to the widest content and push
+     cards past the screen on phones; minmax(0, 1fr) lets the column shrink. Any grid-cols-* utility still wins. */
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid > * { min-width: 0; }
+  img, video, svg { max-width: 100%; }
+  table { max-width: 100%; }
   button { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1; }
   input, select, textarea { @apply focus-visible:outline-none; }
 }

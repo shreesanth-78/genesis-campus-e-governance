@@ -483,6 +483,93 @@ test.describe('E2E-08 chat scope', () => {
   });
 });
 
+test.describe('E2E-09 phone layout', () => {
+  // Nothing may stick out past the screen on a phone: content that is wider than the screen is clipped or forces a
+  // sideways scroll. Scrollable regions (tables, tab rows) are allowed to be wider on purpose.
+  const sweep = {
+    student: [
+      'dashboard',
+      'events',
+      'events/innovation-sprint',
+      'calendar',
+      'registrations',
+      'clubs',
+      'notifications',
+      'assistant',
+      'profile',
+    ].map((p) => '/student/' + p),
+    club: [
+      'dashboard',
+      'profile',
+      'members',
+      'requests',
+      'requests/new',
+      'requests/REQ-1262',
+      'promotions',
+    ].map((p) => '/club/' + p),
+    osa: [
+      'dashboard',
+      'requests',
+      'requests/REQ-1248',
+      'club-applications',
+      'clubs',
+      'clubs/innovation',
+      'reports',
+    ].map((p) => '/admin/osa/' + p),
+  };
+  for (const [who, paths] of Object.entries(sweep)) {
+    for (const width of [320, 375, 414]) {
+      test(who + ' at ' + width + 'px: no content past the screen edge', async ({ browser }) => {
+        const context = await browser.newContext({
+          viewport: { width, height: 800 },
+          isMobile: true,
+          hasTouch: true,
+        });
+        await context.addInitScript((w) => {
+          window.__W = w;
+        }, width);
+        const page = await context.newPage();
+        await signIn(page, who);
+        await expect(page.locator('main, h1').first()).toBeVisible({ timeout: 30_000 });
+        for (const route of paths) {
+          // move around inside the app (a full page load would restart it)
+          await page.evaluate((to) => {
+            history.pushState({}, '', to);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }, route);
+          await expect(page.locator('main h1, main h2').first()).toBeVisible({ timeout: 30_000 });
+          await page.waitForTimeout(400);
+          const bad = await page.evaluate(() => {
+            const iw = window.__W;
+            const inScroller = (e) => {
+              for (let n = e.parentElement; n && n !== document.body; n = n.parentElement) {
+                const o = getComputedStyle(n).overflowX;
+                if (o === 'auto' || o === 'scroll') return true;
+              }
+              return false;
+            };
+            const off = [...document.querySelectorAll('body *')].filter((e) => {
+              const r = e.getBoundingClientRect();
+              const cs = getComputedStyle(e);
+              return (
+                r.width > 0 && r.height > 0 && r.right > iw + 1 && cs.position === 'static' && !inScroller(e)
+              );
+            });
+            return off
+              .filter((e) => !off.includes(e.parentElement))
+              .slice(0, 3)
+              .map(
+                (e) => e.tagName.toLowerCase() + '.' + String(e.className).split(' ').slice(0, 4).join('.'),
+              );
+          });
+          expect(bad, route).toEqual([]);
+        }
+        await context.close();
+      });
+    }
+  }
+});
+
 test.describe('E2E-06 demo reset (kept last: it restores the sample data)', () => {
   test('OSA resets the shared demo data', async ({ browser }) => {
     const osa = await as(browser, 'osa', /Welcome back, Meera/);

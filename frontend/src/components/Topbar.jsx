@@ -71,7 +71,7 @@ export default function Topbar({ onMenu, student = true }) {
       </button>
 
       {student ? (
-        <div ref={searchRef} className="relative max-w-[440px] flex-1">
+        <div ref={searchRef} className="relative min-w-0 max-w-[440px] flex-1">
           <div className="flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 py-2.5 focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-100">
             <Icon name="Search" className="h-4 w-4 text-ink-mute" />
             <input
@@ -110,7 +110,7 @@ export default function Topbar({ onMenu, student = true }) {
         <div className="flex-1" />
       )}
 
-      <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3">
         {student && (
           <button onClick={() => navigate('/student/notifications')} className="relative grid h-10 w-10 place-items-center rounded-full text-ink-soft hover:bg-brand-50" aria-label="Notifications">
             <Icon name="Bell" className="h-[18px] w-[18px]" />

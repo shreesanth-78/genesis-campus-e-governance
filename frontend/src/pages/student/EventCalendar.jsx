@@ -47,7 +47,7 @@ export default function EventCalendar() {
       key={e.id + i}
       onClick={(ev) => { ev.stopPropagation(); setSelected(e.id); }}
       className={cn(
-        'mt-1 block w-full truncate rounded border-l-2 px-1.5 py-1 text-left text-[8px] font-semibold',
+        'mt-1 block w-full truncate rounded border-l-2 px-1.5 py-1 text-left text-[8px] font-semibold max-sm:h-1.5 max-sm:border-l-0 max-sm:p-0 max-sm:text-[0px]', // on phones an event is a small colour bar; tap the day to open it
         CATEGORY_STYLES[e.category].event,
         selected === e.id && 'ring-1 ring-[#e0a02f]'
       )}
@@ -101,9 +101,9 @@ export default function EventCalendar() {
         <div className="card overflow-hidden">
           {view === 'Month' && (
             <div className="overflow-x-auto scroll-thin">
-              <div className="min-w-[640px]">
+              <div className="sm:min-w-[640px]">
                 <div className="grid grid-cols-7 border-b border-line bg-canvas/60">
-                  {WD.map((d) => <div key={d} className="px-3 py-3 text-[8px] font-bold tracking-[0.14em] text-ink-mute">{d}</div>)}
+                  {WD.map((d) => <div key={d} className="px-3 py-3 text-[8px] font-bold tracking-[0.14em] text-ink-mute max-sm:px-0 max-sm:text-center max-sm:tracking-normal">{d}</div>)}
                 </div>
                 <div className="grid grid-cols-7">
                   {cells.map((d, i) => {
@@ -113,7 +113,7 @@ export default function EventCalendar() {
                       <div
                         key={i}
                         onClick={() => d && dayEvents[0] && setSelected(dayEvents[0].id)}
-                        className={cn('min-h-[90px] border-b border-r border-line p-2 text-[9px] text-ink-soft', !d && 'bg-canvas/50', isToday && 'bg-brand-50/60', d && dayEvents[0] && 'cursor-pointer hover:bg-brand-50/40')}
+                        className={cn('min-h-[90px] border-b border-r border-line p-2 text-[9px] text-ink-soft max-sm:min-h-[56px] max-sm:p-1', !d && 'bg-canvas/50', isToday && 'bg-brand-50/60', d && dayEvents[0] && 'cursor-pointer hover:bg-brand-50/40')}
                       >
                         {d && (isToday ? <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white">{d}</span> : <span>{d}</span>)}
                         {dayEvents.map(pill)}
