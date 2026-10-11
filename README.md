@@ -5,6 +5,7 @@
 **Team STORMBREAKER** · GENESIS Hackathon 2026
 
 **Live demo: https://genesis-campus-e-governance.onrender.com** (no install needed, see [how to use it](#3-try-it-live-and-a-five-minute-guided-demo))
+
 **Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
 
 > One campus. One place for every request. Clubs submit event requests, the Events Section and the Office of Student Affairs (OSA) review and approve them in a tracked, role-enforced workflow, and students discover, register for and get notified about approved events, with an AI assistant that knows every club.
