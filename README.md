@@ -6,7 +6,7 @@
 
 > One campus. One place for every request. Clubs submit event requests, the Events Section and the Office of Student Affairs (OSA) review and approve them in a tracked, role-enforced workflow, and students discover, register for and get notified about approved events, with an AI assistant that knows every club.
 
-[Problem](#1-the-problem) · [Solution](#2-our-solution) · [Demo for the jury](#3-five-minute-demo-for-the-jury) · [Features](#4-what-we-built) · [AI](#5-ai-in-the-product) · [Architecture](#6-architecture) · [Security](#7-security-and-trust) · [Tech stack](#8-tech-stack) · [Quality](#9-quality-and-testing) · [Run it](#10-run-it-locally) · [Deploy](#11-deployment) · [Honest status](#12-honest-status-and-roadmap) · [Team](#13-team)
+[Problem](#1-the-problem) · [Solution](#2-our-solution) · [Demo for the jury](#3-five-minute-demo-for-the-jury) · [Features](#4-what-we-built) · [AI](#5-ai-in-the-product) · [Architecture](#6-architecture) · [Security](#7-security-and-trust) · [Tech stack](#8-tech-stack) · [Quality](#9-quality-and-testing) · [Run it](#10-run-it-locally) · [Deploy](#11-deployment) · [Team](#13-team)
 
 ---
 
