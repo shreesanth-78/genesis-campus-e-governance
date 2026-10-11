@@ -230,7 +230,7 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 | Shared: workflow engine, notification copy, permissions                                                      | 19    | pass   |
 | Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, Groq client | 65    | pass   |
 | Frontend screens against an in-memory API running the real engine                                            | 14    | pass   |
-| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                | 19    | pass   |
+| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                | 23    | pass   |
 
 Highlights: the full approval path through four roles, the Events Section being refused final approval **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
 
