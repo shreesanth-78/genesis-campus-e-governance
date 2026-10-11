@@ -16,7 +16,8 @@ export default function Topbar({ onMenu, student = true }) {
   const [openHelp, setOpenHelp] = useState(false);
   const searchRef = useRef(null);
   const inputRef = useRef(null);
-  const menuRef = useRef(null);
+  const helpRef = useRef(null);
+  const userRef = useRef(null);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -32,10 +33,10 @@ export default function Topbar({ onMenu, student = true }) {
     };
     const onClick = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) setOpenSearch(false);
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpenMenu(false);
-        setOpenHelp(false);
-      }
+      // Each popover closes only when the press is outside its own wrapper (the user menu used to be treated as
+      // 'outside' the help wrapper and closed on mouse-down, before its Sign out button could be clicked).
+      if (helpRef.current && !helpRef.current.contains(e.target)) setOpenHelp(false);
+      if (userRef.current && !userRef.current.contains(e.target)) setOpenMenu(false);
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('mousedown', onClick);
@@ -116,7 +117,7 @@ export default function Topbar({ onMenu, student = true }) {
             {unreadCount > 0 && <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-[#e5533d]" />}
           </button>
         )}
-        <div ref={menuRef} className="relative">
+        <div ref={helpRef} className="relative">
           <button onClick={() => setOpenHelp((v) => !v)} className="grid h-10 w-10 place-items-center rounded-full text-ink-soft hover:bg-brand-50" aria-label="Help">
             <Icon name="CircleHelp" className="h-[18px] w-[18px]" />
           </button>
@@ -129,7 +130,7 @@ export default function Topbar({ onMenu, student = true }) {
             </div>
           )}
         </div>
-        <div className="relative">
+        <div ref={userRef} className="relative">
           <button onClick={() => setOpenMenu((v) => !v)} className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 hover:bg-brand-50" aria-haspopup="menu" aria-expanded={openMenu}>
             <Avatar initials={user?.initials} />
             <span className="hidden text-left leading-tight sm:block">

@@ -113,6 +113,25 @@ test.describe('E2E-01 entry screens and sign-in', () => {
   });
 });
 
+test.describe('E2E-01b sign out from the top-right profile menu', () => {
+  for (const [who, home] of [
+    ['student', /Good (morning|afternoon|evening), Arjun/],
+    ['club', /Google Developer Student Clubs/],
+    ['osa', /Welcome back, Meera/],
+    ['events', /Welcome back, Rohan/],
+  ]) {
+    test(`${who}: the user menu Sign out ends the session`, async ({ browser }) => {
+      const { context, page } = await as(browser, who, home);
+      await page.locator('button[aria-haspopup="menu"]').click();
+      await page.getByRole('menuitem', { name: 'Sign out' }).click();
+      await expect(page).toHaveURL(/\/$/);
+      await page.goto('/student/dashboard');
+      await expect(page).toHaveURL(/\/$/); // the session is really gone
+      await context.close();
+    });
+  }
+});
+
 test.describe('E2E-02 student registration', () => {
   test('registers, the seat is saved on the server, survives a reload, and can be cancelled', async ({
     browser,
