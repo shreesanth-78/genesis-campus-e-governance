@@ -4,7 +4,7 @@
 
 **Team STORMBREAKER** · GENESIS Hackathon 2026
 
-**🔗 Live demo: https://genesis-campus-e-governance.vercel.app** (no install needed, see [how to use it](#3-try-it-live-and-a-five-minute-guided-demo))
+**🔗 Live demo: https://genesis-campus-e-governance.onrender.com** (no install needed, see [how to use it](#3-try-it-live-and-a-five-minute-guided-demo))
 
 > One campus. One place for every request. Clubs submit event requests, the Events Section and the Office of Student Affairs (OSA) review and approve them in a tracked, role-enforced workflow, and students discover, register for and get notified about approved events, with an AI assistant that knows every club.
 
@@ -49,13 +49,13 @@ Design principles: **the server is the authority** (the browser only hides butto
 
 ## 3. Try it live, and a five-minute guided demo
 
-**Live link: https://genesis-campus-e-governance.vercel.app**
+**Live link: https://genesis-campus-e-governance.onrender.com**
 
-The portal is deployed: the website on Vercel, the API on Render and the database on Neon (see [section 11](#11-deployment)). Nothing to install and no sign-up: open the link and use one of the demo accounts below.
+The portal is deployed as **one service on Render**: the same address serves the website and the API, with the database on Neon (see [section 11](#11-deployment)). Nothing to install and no sign-up: open the link and use one of the demo accounts below.
 
 ### How to use the live link
 
-1. **Open** https://genesis-campus-e-governance.vercel.app. You land on **"Who's signing in?"** with three choices: **Student**, **Club Authority**, **Administrator** (which then asks for **OSA** or **Events Section**).
+1. **Open** https://genesis-campus-e-governance.onrender.com. You land on **"Who's signing in?"** with three choices: **Student**, **Club Authority**, **Administrator** (which then asks for **OSA** or **Events Section**).
 2. **Pick the role** you want to try, then on the sign-in screen press the green **Fill** button. It enters that role's demo User ID and password. Press **Sign in**.
 3. **Explore.** Each role has its own sidebar. **Sign out** is at the bottom of the sidebar.
 4. **Try another role** by signing out and choosing a different one. To see two roles side by side (for example a club submitting while OSA approves), use a **second private/incognito window**: one browser profile keeps one signed-in person at a time.
@@ -236,7 +236,7 @@ Highlights: the full approval path through four roles, the Events Section being 
 
 ## 10. Run it locally
 
-_Optional: the [live link](https://genesis-campus-e-governance.vercel.app) needs none of this._
+_Optional: the [live link](https://genesis-campus-e-governance.onrender.com) needs none of this._
 
 You need Node 20+ and a PostgreSQL database; a free [Neon](https://neon.tech) project works.
 
@@ -281,7 +281,7 @@ flowchart LR
 | Health    | `/api/v1/health` answers `{"data":{"status":"ok","database":"up"}}`                       |
 | Blueprint | [`render.yaml`](render.yaml) describes the service for one-click setup                    |
 
-The live demo link at the top of this README is the deployed instance. The same build can also be hosted with the website on Vercel (`frontend/vercel.json`) forwarding `/api` to the backend; see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+The live demo link at the top of this README is this deployed instance: https://genesis-campus-e-governance.onrender.com (health check: `/api/v1/health`). The website can alternatively be hosted separately on Vercel (`frontend/vercel.json`) forwarding `/api` to the backend; see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ### Deploying your own copy
 
