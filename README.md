@@ -4,9 +4,11 @@
 
 **Team STORMBREAKER** · GENESIS Hackathon 2026
 
+**🔗 Live demo: https://genesis-campus-e-governance.vercel.app** (no install needed, see [how to use it](#3-try-it-live-and-a-five-minute-guided-demo))
+
 > One campus. One place for every request. Clubs submit event requests, the Events Section and the Office of Student Affairs (OSA) review and approve them in a tracked, role-enforced workflow, and students discover, register for and get notified about approved events, with an AI assistant that knows every club.
 
-[Problem](#1-the-problem) · [Solution](#2-our-solution) · [Demo for the jury](#3-five-minute-demo-for-the-jury) · [Features](#4-what-we-built) · [AI](#5-ai-in-the-product) · [Architecture](#6-architecture) · [Security](#7-security-and-trust) · [Tech stack](#8-tech-stack) · [Quality](#9-quality-and-testing) · [Run it](#10-run-it-locally) · [Deploy](#11-deployment) · [Team](#13-team)
+[Problem](#1-the-problem) · [Solution](#2-our-solution) · [Live demo](#3-try-it-live-and-a-five-minute-guided-demo) · [Features](#4-what-we-built) · [AI](#5-ai-in-the-product) · [Architecture](#6-architecture) · [Security](#7-security-and-trust) · [Tech stack](#8-tech-stack) · [Quality](#9-quality-and-testing) · [Run it](#10-run-it-locally) · [Deploy](#11-deployment) · [Team](#13-team)
 
 ---
 
@@ -45,9 +47,18 @@ What changes for each person:
 
 Design principles: **the server is the authority** (the browser only hides buttons), **nothing reaches students until it is approved**, and **every step leaves a visible, timestamped record**.
 
-## 3. Five-minute demo for the jury
+## 3. Try it live, and a five-minute guided demo
 
-Run it (see [section 10](#10-run-it-locally)) and open http://localhost:5173. The sign-in screen has a **Fill** button for each demo account.
+**Live link: https://genesis-campus-e-governance.vercel.app**
+
+The portal is deployed: the website on Vercel, the API on Render and the database on Neon (see [section 11](#11-deployment)). Nothing to install and no sign-up: open the link and use one of the demo accounts below.
+
+### How to use the live link
+
+1. **Open** https://genesis-campus-e-governance.vercel.app. You land on **"Who's signing in?"** with three choices: **Student**, **Club Authority**, **Administrator** (which then asks for **OSA** or **Events Section**).
+2. **Pick the role** you want to try, then on the sign-in screen press the green **Fill** button. It enters that role's demo User ID and password. Press **Sign in**.
+3. **Explore.** Each role has its own sidebar. **Sign out** is at the bottom of the sidebar.
+4. **Try another role** by signing out and choosing a different one. To see two roles side by side (for example a club submitting while OSA approves), use a **second private/incognito window**: one browser profile keeps one signed-in person at a time.
 
 | Role           | Choose on first screen | User ID      | Password     |
 | -------------- | ---------------------- | ------------ | ------------ |
@@ -56,14 +67,29 @@ Run it (see [section 10](#10-run-it-locally)) and open http://localhost:5173. Th
 | Events Section | Administrator, Events  | `EVT001`     | `events123`  |
 | OSA            | Administrator, OSA     | `OSA001`     | `osa123`     |
 
+### Good to know while using the live link
+
+- **The first request may take up to a minute** if the API has been idle: free hosting tiers put services to sleep. After the first sign-in everything is fast.
+- **The data is shared and real.** Everything you do (submit, approve, register) is saved in the live database and visible to everyone else using the demo at the same time. That is the point: one role's approval shows up for another role within seconds. Please try the flows, but avoid anything you would not want other people to see.
+- **The calendar says "Saturday 10 October 2026".** The sample data is built around a fixed demo date so deadlines and seats stay meaningful. This is intentional.
+- **Sign-ins last two hours.** After that you are returned to the first screen; just sign in again.
+- **Please do not use Settings → "Reset demo data" on the live site.** It is meant for local demos and is refused when the server runs in production mode; leave the shared data alone.
+- **AI features use the server's AI key.** With the key, the chat and the "just dropped" notifications are written by a language model; without it the chat answers with built-in rules and notifications use curated static quotes. Both work and both stay strictly on topic.
+
+### Guided demo (about five minutes)
+
+Follow one event from request to registration. Use two windows (one normal, one private) so you can switch roles quickly.
+
 1. **Club Authority** → _Event Requests → New request_. Fill the form, attach a poster and the three required documents, press **Submit for review**. Watch the five-step tracker.
-2. **Events Section** → open the request → **Clear online review**, then **Record hard-copy check** (reference number). Note that **Grant final approval is locked** with an explanation; the server refuses it too.
-3. **OSA** → open the same request → **Grant final approval**. (Try _Request corrections_ or _Reject_ first on another request to see the feedback loop.)
+2. **Events Section** → open the request → **Clear online review**, then **Record hard-copy check** (give a reference number). Note that **Grant final approval is locked** with an explanation; the server refuses it too.
+3. **OSA** → open the same request → **Grant final approval**. (On another request try _Request corrections_ or _Reject_ to see the feedback loop; the club can correct and resubmit.)
 4. **Events Section** → **Publish & notify students**. Only now does the event exist for students.
-5. **Student** → the event is on the dashboard with a notification such as _"Midnight Maker Sprint just dropped"_ carrying an event-specific hook line. Register for it; the seat count updates for everyone.
-6. **Student → Campus AI Assistant**: ask _"I like music, which clubs suit me?"_, _"What is GDSC for?"_, _"What are the current events?"_, then try _"solve 12\*13+7"_ and see that it politely refuses.
-7. **Administrator** → _Club Applications_ → run the **AI duplicate-club check** and approve a new club; it appears for students at once.
-8. **Sign out** from the sidebar (every role has it). Sessions expire after two hours.
+5. **Student** → the event is on the dashboard with a notification such as _"Midnight Maker Sprint just dropped"_ carrying a hook line. Open it and **Register**; the seat count updates for everyone.
+6. **Student → Campus AI Assistant**: ask _"I like music, which clubs suit me?"_, _"What is GDSC for?"_ and _"What are the current events?"_. Then try _"solve 12\*13+7"_ and see that it refuses: it only talks about clubs, events and the portal.
+7. **Administrator** → _Club Applications_ → run the **AI duplicate-club check** and approve a new club; it appears in the students' club directory at once.
+8. **Sign out** from the sidebar (every role has it).
+
+Prefer to run it yourself? See [section 10](#10-run-it-locally).
 
 ## 4. What we built
 
@@ -210,6 +236,8 @@ Highlights: the full approval path through four roles, the Events Section being 
 
 ## 10. Run it locally
 
+_Optional: the [live link](https://genesis-campus-e-governance.vercel.app) needs none of this._
+
 You need Node 20+ and a PostgreSQL database; a free [Neon](https://neon.tech) project works.
 
 ```bash
@@ -233,8 +261,27 @@ Optional AI: set `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`) in `backend/.env`. With
 
 ## 11. Deployment
 
-Designed as two independent deployables plus a managed database: **frontend** on Vercel or Netlify (`frontend/vercel.json` is included and forwards `/api` to the backend), **backend** on Render, Railway or Fly (`npm start -w backend`), **database** on Neon. Environment variables, the cross-domain cookie setup and a checklist are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+### Live deployment
 
+| Part         | Where                                                  | Notes                                                                                                                                                   |
+| ------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Website**  | Vercel: https://genesis-campus-e-governance.vercel.app | Builds `frontend/`; `frontend/vercel.json` sends every page to the single-page app and forwards `/api/*` to the API, so the browser talks to one origin |
+| **API**      | Render (Node service)                                  | Runs `backend/`; applies database migrations on start; AI key and secrets are environment variables, never in the repo                                  |
+| **Database** | Neon (PostgreSQL)                                      | One database for users, requests, approvals, seats and posters                                                                                          |
+
+```mermaid
+flowchart LR
+    J[Jury browser] --> V[Vercel<br/>React site]
+    V -- /api/* rewrite --> R[Render<br/>Express API]
+    R --> N[(Neon PostgreSQL)]
+    R -. optional .-> G[Groq / Claude]
+```
+
+Health check: https://genesis-campus-e-governance.vercel.app/api/v1/health should answer `{"data":{"status":"ok","database":"up"}}`.
+
+### Deploying your own copy
+
+Designed as two independent deployables plus a managed database: **frontend** on Vercel or Netlify (`frontend/vercel.json` is included and forwards `/api` to the backend), **backend** on Render, Railway or Fly (`npm start -w backend`), **database** on Neon. Environment variables, the cross-domain cookie setup and a checklist are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## 12. Team
 
