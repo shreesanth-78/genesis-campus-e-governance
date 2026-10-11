@@ -22,6 +22,10 @@ export function createFakeServer() {
   const students = {};
   const regs = {};
   const sessions = new Map(); // token -> { user, portal }
+  const joined = {}; // student user id -> club ids
+  let posts = []; // club space posts
+  let seq = 0;
+  const clubsOf = (id) => (joined[id] ??= ['innovation']);
 
   const portalOf = (u) => (u.role === 'admin' ? u.adminType : u.role);
   const actorOf = ({ password: _p, ...u }) => ({ ...u, id: u.userId });
@@ -81,7 +85,61 @@ export function createFakeServer() {
       const { ok, error, state: _s, ...extra } = res;
       return json({ ok, error: ok ? undefined : error, extra, state: view(session.portal, actor) });
     }
+    // ---- club space ----
+    const spaceMatch = path.match(/^\/gov\/clubs\/([^/]+)\/(space|posts)(?:\/([^/]+))?$/);
+    if (spaceMatch) {
+      const [, clubId, part, postId] = spaceMatch;
+      const isAuthority = session.portal === 'club' && actor.clubId === clubId;
+      const isMember = session.portal === 'student' && clubsOf(actor.userId).includes(clubId);
+      if (!isAuthority && !isMember) return fail(403, 'FORBIDDEN', 'Join this club to see its space.');
+      const club = selectors.allClubs(state).find((c) => c.id === clubId);
+      if (part === 'space') {
+        const events = state.requests
+          .filter(
+            (r) =>
+              r.clubId === clubId &&
+              (isAuthority ? r.status !== 'draft' : ['published', 'completed'].includes(r.status)),
+          )
+          .map((r) => ({ id: r.id, title: r.title, date: r.date }));
+        return json({
+          club: { id: clubId, name: club.name },
+          canAnnounce: isAuthority,
+          memberCount: Object.values(joined).filter((l) => l.includes(clubId)).length,
+          events,
+          posts: posts
+            .filter((p) => p.clubId === clubId)
+            .map((p) => ({
+              ...p,
+              mine: p.userId === actor.userId,
+              canDelete: isAuthority || p.userId === actor.userId,
+            })),
+        });
+      }
+      if (method === 'POST') {
+        if (body.kind === 'announcement' && !isAuthority)
+          return fail(403, 'FORBIDDEN', 'Only the club authority posts announcements.');
+        if (!String(body.body ?? '').trim()) return fail(400, 'VALIDATION', 'Write something first.');
+        const p = {
+          id: `p${++seq}`,
+          clubId,
+          userId: actor.userId,
+          kind: body.kind,
+          body: body.body.trim(),
+          eventId: body.eventId || null,
+          authorName: isAuthority ? `${club.name} authority` : actor.name,
+          authorRole: isAuthority ? 'authority' : 'member',
+          createdAt: new Date().toISOString(),
+        };
+        posts = [...posts, p];
+        return json({ ...p, mine: true, canDelete: true }, 201);
+      }
+      if (method === 'DELETE') {
+        posts = posts.filter((p) => p.id !== postId);
+        return json({ removed: true });
+      }
+    }
     if (path === '/gov/reset') {
+      posts = [];
       state = createSeedState();
       return json({ reset: true });
     }
@@ -95,6 +153,7 @@ export function createFakeServer() {
       };
       const shape = () => ({
         ...mine,
+        memberships: clubsOf(actor.userId),
         registrations: list.map((eventId) => ({
           eventId,
           ref: '',
@@ -116,6 +175,16 @@ export function createFakeServer() {
       if (path.startsWith('/gov/student/registrations/')) {
         const id = decodeURIComponent(path.split('/').pop());
         regs[actor.userId] = list.filter((e) => e !== id);
+        return json(reply());
+      }
+      if (path === '/gov/student/memberships' && method === 'POST') {
+        const l = clubsOf(actor.userId);
+        if (!l.includes(body.clubId)) l.push(body.clubId);
+        return json(reply(), 201);
+      }
+      if (path.startsWith('/gov/student/memberships/')) {
+        const id = decodeURIComponent(path.split('/').pop());
+        joined[actor.userId] = clubsOf(actor.userId).filter((c) => c !== id);
         return json(reply());
       }
       if (path === '/gov/student/favorites') {
@@ -162,6 +231,8 @@ export function createFakeServer() {
       sessions.clear();
       Object.keys(students).forEach((k) => delete students[k]);
       Object.keys(regs).forEach((k) => delete regs[k]);
+      Object.keys(joined).forEach((k) => delete joined[k]);
+      posts = [];
     },
     get state() {
       return state;

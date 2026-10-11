@@ -17,6 +17,8 @@ export async function resetDemoData(db) {
   demoOnly();
   await db.transaction(async (trx) => {
     await trx('gov_registrations').del();
+    await trx('gov_club_posts').del();
+    await trx('gov_club_members').del();
     await trx('gov_user_state').del();
     await trx('gov_docs').del();
     await trx('gov_meta').del();
@@ -30,6 +32,7 @@ export async function resetDemoData(db) {
 export async function resetStudent(db, user) {
   await db.transaction(async (trx) => {
     await trx('gov_registrations').where({ user_id: user.id }).del();
+    await trx('gov_club_members').where({ user_id: user.id }).del();
     await trx('gov_user_state').where({ user_id: user.id }).del();
     if (user.username === demoStudentName()) await seedDemoStudent(trx, user.id);
   });

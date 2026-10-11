@@ -16,6 +16,7 @@ export default function ClubLayout() {
     { to: '/club/dashboard', label: 'Overview', icon: 'LayoutGrid' },
     { to: '/club/profile', label: 'Club Profile', icon: 'Landmark' },
     { to: '/club/members', label: 'Members', icon: 'Users' },
+    { to: '/club/space', label: 'Club Space', icon: 'MessageCircle' },
     { to: '/club/requests', label: 'Event Requests', icon: 'ClipboardList', count: action },
     { to: '/club/promotions', label: 'Promotions', icon: 'Megaphone' },
     { to: '/club/events', label: 'Our Events', icon: 'CalendarDays' },

@@ -7,11 +7,12 @@ import { useApp } from '../context/AppContext';
 
 export default function ClubModal({ club, onClose }) {
   const navigate = useNavigate();
-  const { favorites, toggleFavorite } = useApp();
+  const { favorites, toggleFavorite, memberships, joinClub, leaveClub } = useApp();
   const { events: EVENTS } = useGov();
   if (!club) return null;
   const tone = CLUB_TONES[club.tone];
   const fav = favorites.includes(club.id);
+  const member = memberships.includes(club.id);
   const events = EVENTS.filter((e) => e.clubId === club.id && e.status !== 'closed');
 
   return (
@@ -47,13 +48,28 @@ export default function ClubModal({ club, onClose }) {
               </ul>
             )}
           </div>
-          <div className="mt-5 flex gap-2">
+          <div className={cn('mt-5 rounded-2xl border px-4 py-3', member ? 'border-brand-200 bg-brand-50' : 'border-line bg-canvas')}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-soft">
+                {member ? <><b className="text-brand-900">You are a member.</b> The club’s announcements and discussion are in your Club Space.</> : <><b className="text-brand-900">Join this club</b> to read its announcements and talk with other members in the Club Space, instead of in WhatsApp.</>}
+              </p>
+              {member ? (
+                <div className="flex gap-2">
+                  <button onClick={() => { onClose(); navigate(`/student/club-space?club=${club.id}`); }} className="btn-primary px-3 py-2 text-[11px]"><Icon name="MessageCircle" className="h-3.5 w-3.5" /> Open space</button>
+                  <button onClick={() => leaveClub(club.id)} className="btn-ghost px-3 py-2 text-[11px]">Leave</button>
+                </div>
+              ) : (
+                <button onClick={() => joinClub(club.id)} className="btn-primary px-3 py-2 text-[11px]"><Icon name="UserPlus" className="h-3.5 w-3.5" /> Join club</button>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
             <button onClick={() => toggleFavorite(club.id)} className={cn('btn-primary flex-1', fav && 'bg-brand-50 text-brand-800 hover:bg-brand-100')}>
               <Icon name="Heart" className="h-4 w-4" fill={fav ? 'currentColor' : 'none'} /> {fav ? 'Saved to favourites' : 'Save to favourites'}
             </button>
             <button onClick={onClose} className="btn-ghost">Close</button>
           </div>
-          <p className="mt-3 text-[9px] text-ink-mute">Favourites are just a bookmark — saving a club does not enrol you or imply official membership.</p>
+          <p className="mt-3 text-[9px] text-ink-mute">Saving to favourites is only a bookmark. Joining gives you access to the club’s space.</p>
         </div>
       </div>
     </div>

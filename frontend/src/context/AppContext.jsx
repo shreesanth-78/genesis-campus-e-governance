@@ -5,6 +5,8 @@ import { useGov } from './GovContext';
 import {
   cancelEventRegistration,
   fetchStudent,
+  joinClubRequest,
+  leaveClubRequest,
   markNotificationsRead,
   registerForEvent,
   saveStudentPrefs,
@@ -22,6 +24,7 @@ const BLANK = {
   registrations: [],
   favorites: [],
   bookmarks: [],
+  memberships: [],
   notifications: [],
   history: [],
   prefs: { inApp: true, email: false, deadlines: true, news: true, interests: [] },
@@ -37,7 +40,7 @@ export function AppProvider({ children }) {
   const [confirmation, setConfirmation] = useState(null); // event shown in the success modal
   const busy = useRef(0);
 
-  const { registrations, favorites, bookmarks, notifications, prefs, history } = data;
+  const { registrations, favorites, bookmarks, memberships, notifications, prefs, history } = data;
 
   const notify = useCallback((message, tone = 'success') => setToast({ message, tone, id: Date.now() }), []);
 
@@ -191,6 +194,31 @@ export function AppProvider({ children }) {
     [data, bookmarks, sync, notify],
   );
 
+  const joinClub = useCallback(
+    (clubId) => {
+      if (memberships.includes(clubId)) return;
+      notify('You joined the club. Its space is now in your sidebar.');
+      sync(
+        { ...data, memberships: [...memberships, clubId] },
+        () => joinClubRequest(clubId),
+        'Could not join that club.',
+      );
+    },
+    [data, memberships, sync, notify],
+  );
+
+  const leaveClub = useCallback(
+    (clubId) => {
+      notify('You left the club.', 'info');
+      sync(
+        { ...data, memberships: memberships.filter((c) => c !== clubId) },
+        () => leaveClubRequest(clubId),
+        'Could not leave that club.',
+      );
+    },
+    [data, memberships, sync, notify],
+  );
+
   const markAllRead = useCallback(() => {
     sync(
       { ...data, notifications: notifications.map((n) => ({ ...n, unread: false })) },
@@ -226,6 +254,9 @@ export function AppProvider({ children }) {
     registrations,
     favorites,
     bookmarks,
+    memberships,
+    joinClub,
+    leaveClub,
     notifications,
     history,
     unreadCount,

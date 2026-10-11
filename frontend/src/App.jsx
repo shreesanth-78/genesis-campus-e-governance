@@ -18,6 +18,7 @@ import FavoriteClubs from './pages/student/FavoriteClubs';
 import Notifications from './pages/student/Notifications';
 import CampusAssistant from './pages/student/CampusAssistant';
 import StartClub from './pages/student/StartClub';
+import StudentClubSpace from './pages/student/ClubSpacePage';
 import Profile from './pages/student/Profile';
 import Settings from './pages/student/Settings';
 
@@ -37,6 +38,7 @@ import ClubLayout from './pages/club/ClubLayout';
 import ClubOverview from './pages/club/ClubOverview';
 import ClubProfile from './pages/club/ClubProfile';
 import ClubMembers from './pages/club/ClubMembers';
+import ClubSpaceAuthority from './pages/club/ClubSpaceAuthority';
 import ClubRequests from './pages/club/ClubRequests';
 import RequestForm from './pages/club/RequestForm';
 import ClubRequestDetail from './pages/club/ClubRequestDetail';
@@ -86,6 +88,7 @@ export default function App() {
         <Route path="favorites" element={<FavoriteClubs />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="assistant" element={<CampusAssistant />} />
+        <Route path="club-space" element={<StudentClubSpace />} />
         <Route path="start-club" element={<StartClub />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
@@ -142,6 +145,7 @@ export default function App() {
         <Route path="dashboard" element={<ClubOverview />} />
         <Route path="profile" element={<ClubProfile />} />
         <Route path="members" element={<ClubMembers />} />
+        <Route path="space" element={<ClubSpaceAuthority />} />
         <Route path="requests" element={<ClubRequests />} />
         <Route path="requests/new" element={<RequestForm />} />
         <Route path="requests/:id" element={<ClubRequestDetail />} />

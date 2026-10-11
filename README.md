@@ -98,7 +98,8 @@ Follow one event from request to registration. Use two windows (one normal, one 
 5. **Student** → the event is on the dashboard with a notification such as _"Midnight Maker Sprint just dropped"_ carrying a hook line. Open it and **Register**; the seat count updates for everyone. Then **Events Section** → _Hall Requests_ (highest priority first) → **Allocate this hall**, assign a different one, or refuse with a reason; the club and the students see the result.
 6. **Student → Campus AI Assistant**: ask _"I like music, which clubs suit me?"_, _"What is GDSC for?"_ and _"What are the current events?"_. Then try _"solve 12\*13+7"_ and see that it refuses: it only talks about clubs, events and the portal.
 7. **Student → Start a club**: describe _"a group that learns programming and takes part in coding contests"_ and press **Check my idea**: it is stopped because a coding club exists. Try a new idea (_"beekeeping on campus"_) and apply. **OSA** → _Club Applications_ → open it → approve; the club appears in the directory.
-8. **Sign out** from the sidebar (every role has it).
+8. **Club Space**: as the **Student** open _Clubs Directory → Hut Labs → Join club_, then _Club Space_ and post a message. As **Club Authority** `CLUB002` open _Club Space_, read it and post an **announcement**. The student sees it highlighted; no other club can open the board.
+9. **Sign out** from the sidebar (every role has it).
 
 Prefer to run it yourself? See [section 10](#10-run-it-locally).
 
@@ -106,11 +107,11 @@ Prefer to run it yourself? See [section 10](#10-run-it-locally).
 
 ### Student portal
 
-Dashboard with countdowns · **Start a club** (idea check against every club and pending application, then apply and follow the status) · explore and search events with live seat counts · event details · **one-click registration checked by the server** (a full or closed event cannot be booked; two students racing for the last seat cannot both get it) · calendar · registrations and history · clubs directory with favourites · notifications · **Campus AI Assistant** · profile and settings.
+Dashboard with countdowns · **Club Space** (join a club, then read its announcements and discuss events with other members in a private board, instead of WhatsApp) · **Start a club** (idea check against every club and pending application, then apply and follow the status) · explore and search events with live seat counts · event details · **one-click registration checked by the server** (a full or closed event cannot be booked; two students racing for the last seat cannot both get it) · calendar · registrations and history · clubs directory with favourites · notifications · **Campus AI Assistant** · profile and settings.
 
 ### Club Authority portal
 
-Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning · tracker, feedback and **version history on resubmission** · **circulate an approved event** and watch the registrations · **request a hall for the registered crowd**, with halls sorted by fit, an AI recommendation and a priority · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
+Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning · tracker, feedback and **version history on resubmission** · **Club Space**: post highlighted announcements, join the discussion, see and remove members · **circulate an approved event** and watch the registrations · **request a hall for the registered crowd**, with halls sorted by fit, an AI recommendation and a priority · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
 
 ### OSA
 
@@ -243,9 +244,9 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 | Suite                                                                                                                     | Tests | Status |
 | ------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Shared: workflow engine, hall ranking and permission, notification copy, permissions                                      | 35    | pass   |
-| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 79    | pass   |
-| Frontend screens against an in-memory API running the real engine                                                         | 19    | pass   |
-| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 38    | pass   |
+| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 87    | pass   |
+| Frontend screens against an in-memory API running the real engine                                                         | 21    | pass   |
+| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 39    | pass   |
 
 Highlights: the full approval path through four roles, the Events Section being refused any review or approval step **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
 

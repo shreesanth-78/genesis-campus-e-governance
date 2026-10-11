@@ -6,6 +6,7 @@ import { getLlm } from '../../lib/llm.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import * as ai from './ai.service.js';
+import * as space from './clubspace.service.js';
 import { readImage } from './files.service.js';
 import * as gov from './gov.service.js';
 import { PORTALS, portalUser } from './portal.js';
@@ -101,6 +102,78 @@ govRouter.post(
     res.json({ data: await student.getStudent(db(req), req.user) });
   }),
 );
+govRouter.post(
+  '/student/memberships',
+  auth,
+  onlyStudents,
+  validate({ body: idSchema('clubId') }),
+  wrap(async (req, res) => {
+    await space.join(db(req), req.user, req.body.clubId);
+    res.status(201).json({ data: await student.getStudent(db(req), req.user) });
+  }),
+);
+govRouter.delete(
+  '/student/memberships/:clubId',
+  auth,
+  onlyStudents,
+  wrap(async (req, res) => {
+    await space.leave(db(req), req.user, req.params.clubId);
+    res.json({ data: await student.getStudent(db(req), req.user) });
+  }),
+);
+
+// ---------- Club Space: the private board of a club (its joined students and its authority) ----------
+const spaceCtx = async (req) => {
+  const portal = await portalFor(req);
+  if (!['student', 'club'].includes(portal)) throw errors.forbidden('Your role does not use club spaces.');
+  return { portal, actor: req.actor, user: req.user };
+};
+const postSchema = z.object({
+  kind: z.enum(['announcement', 'discussion']),
+  body: z.string().max(5000),
+  eventId: z.string().trim().max(64).optional().nullable(),
+});
+govRouter.get(
+  '/clubs/:clubId/space',
+  auth,
+  wrap(async (req, res) =>
+    res.json({ data: await space.space(db(req), await spaceCtx(req), req.params.clubId) }),
+  ),
+);
+govRouter.post(
+  '/clubs/:clubId/posts',
+  auth,
+  validate({ body: postSchema }),
+  wrap(async (req, res) =>
+    res
+      .status(201)
+      .json({ data: await space.post(db(req), await spaceCtx(req), req.params.clubId, req.body) }),
+  ),
+);
+govRouter.delete(
+  '/clubs/:clubId/posts/:postId',
+  auth,
+  wrap(async (req, res) => {
+    await space.removePost(db(req), await spaceCtx(req), req.params.clubId, req.params.postId);
+    res.json({ data: { removed: true } });
+  }),
+);
+govRouter.get(
+  '/clubs/:clubId/members',
+  auth,
+  wrap(async (req, res) =>
+    res.json({ data: await space.members(db(req), await spaceCtx(req), req.params.clubId) }),
+  ),
+);
+govRouter.delete(
+  '/clubs/:clubId/members/:userId',
+  auth,
+  wrap(async (req, res) => {
+    await space.removeMember(db(req), await spaceCtx(req), req.params.clubId, req.params.userId);
+    res.json({ data: { removed: true } });
+  }),
+);
+
 govRouter.post(
   '/student/registrations',
   auth,

@@ -4,6 +4,7 @@ import { clock } from '../../lib/clock.js';
 import { errors } from '../../lib/errors.js';
 import { loadState, lockState } from './state.js';
 import { registrationCounts } from './gov.service.js';
+import { membershipsOf } from './clubspace.service.js';
 
 const DEMO_TODAY = '2026-10-10';
 const blank = () => ({ favorites: [], bookmarks: [], notifications: [], prefs: EMPTY_PREFS, history: [] });
@@ -25,6 +26,26 @@ async function writeDoc(db, userId, doc) {
 export async function seedDemoStudent(db, userId) {
   const { registrations, ...doc } = DEMO_STUDENT_STATE;
   await writeDoc(db, userId, doc);
+  // the demo student has already joined the Innovation club, whose space starts with a welcome announcement
+  const at = toDb(clock.now());
+  await db('gov_club_members')
+    .insert({ club_id: 'innovation', user_id: userId, joined_at: at })
+    .onConflict(['club_id', 'user_id'])
+    .ignore();
+  await db('gov_club_posts')
+    .insert({
+      id: 'seed-welcome-innovation',
+      club_id: 'innovation',
+      user_id: null,
+      author_name: 'Innovation club authority',
+      author_role: 'authority',
+      kind: 'announcement',
+      event_id: null,
+      body: 'Welcome to the club space. Announcements about our events appear here, and you can discuss plans with other members instead of in WhatsApp.',
+      created_at: at,
+    })
+    .onConflict('id')
+    .ignore();
   for (const r of registrations) {
     await db('gov_registrations')
       .insert({
@@ -62,7 +83,11 @@ export async function getStudent(db, user) {
     doc = { ...doc, notifications: [...fresh, ...doc.notifications] };
     await writeDoc(db, user.id, doc);
   }
-  return { ...doc, registrations: await registrationsOf(db, user.id) };
+  return {
+    ...doc,
+    registrations: await registrationsOf(db, user.id),
+    memberships: await membershipsOf(db, user),
+  };
 }
 
 async function mutateDoc(db, user, fn) {

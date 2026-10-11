@@ -52,6 +52,20 @@ export const markNotificationsRead = (body) =>
   api('/gov/student/notifications/read', { method: 'POST', body });
 export const saveStudentPrefs = (prefs) => api('/gov/student/prefs', { method: 'PUT', body: { prefs } });
 
+// ---- club space (the private board of a club: its joined students and its authority) ----
+export const joinClubRequest = (clubId) =>
+  api('/gov/student/memberships', { method: 'POST', body: { clubId } });
+export const leaveClubRequest = (clubId) =>
+  api(`/gov/student/memberships/${encodeURIComponent(clubId)}`, { method: 'DELETE' });
+export const fetchClubSpace = (clubId) => api(`/gov/clubs/${encodeURIComponent(clubId)}/space`);
+export const postToClub = (clubId, body) =>
+  api(`/gov/clubs/${encodeURIComponent(clubId)}/posts`, { method: 'POST', body });
+export const deleteClubPost = (clubId, postId) =>
+  api(`/gov/clubs/${encodeURIComponent(clubId)}/posts/${encodeURIComponent(postId)}`, { method: 'DELETE' });
+export const fetchClubMembers = (clubId) => api(`/gov/clubs/${encodeURIComponent(clubId)}/members`);
+export const removeClubMember = (clubId, userId) =>
+  api(`/gov/clubs/${encodeURIComponent(clubId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+
 // ---- demo data (the server refuses these unless the demo accounts are enabled) ----
 export const resetDemoData = () => api('/gov/reset', { method: 'POST' });
 export const resetStudentData = () => api('/gov/student/reset', { method: 'POST' });

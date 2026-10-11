@@ -10,6 +10,7 @@ export const STUDENT_NAV = [
   { to: '/student/calendar', label: 'Event Calendar', icon: 'CalendarDays' },
   { to: '/student/registrations', label: 'My Registrations', icon: 'Ticket' },
   { to: '/student/clubs', label: 'Clubs Directory', icon: 'Users' },
+  { to: '/student/club-space', label: 'Club Space', icon: 'MessageCircle' },
   { to: '/student/start-club', label: 'Start a Club', icon: 'Lightbulb' },
   { to: '/student/favorites', label: 'My Favorite Clubs', icon: 'Heart' },
   { to: '/student/notifications', label: 'Notifications', icon: 'Bell', badge: true },

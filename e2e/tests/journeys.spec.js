@@ -464,6 +464,7 @@ test.describe('E2E-05 every screen opens', () => {
       'calendar',
       'registrations',
       'clubs',
+      'club-space',
       'start-club',
       'favorites',
       'notifications',
@@ -721,6 +722,56 @@ test.describe('E2E-10 hall requests, priority and allocation', () => {
     await club.page.getByRole('button', { name: /Request this hall/ }).click();
     await expect(club.page.getByText(/Waiting for the Events Section/)).toBeVisible();
     for (const c of [club, events]) await c.context.close();
+  });
+});
+
+test.describe('E2E-11 club space', () => {
+  test('a student joins a club, discusses with the authority, and another club cannot see it', async ({
+    browser,
+  }) => {
+    const said = 'Who can bring extension cords? ' + uniq();
+    const note = 'Rehearsal moved to 5 PM. ' + uniq();
+    const student = await as(browser, 'student', /Good (morning|afternoon|evening), Arjun/);
+    await student.page.goto('/student/clubs');
+    await student.page
+      .locator('article', { hasText: 'Hut Labs' })
+      .getByRole('button', { name: /View club/ })
+      .click();
+    await student.page.getByRole('button', { name: /Join club/ }).click();
+    await expect(student.page.getByText(/You are a member/)).toBeVisible();
+
+    await student.page.goto('/student/club-space?club=robotics');
+    await expect(student.page.getByText('Hut Labs space')).toBeVisible();
+    await student.page.getByLabel('Write a message').fill(said);
+    await student.page.getByRole('button', { name: 'Post', exact: true }).click();
+    await expect(student.page.getByText(said)).toBeVisible();
+
+    const authority = await as(browser, 'club2', /Hut Labs/);
+    await authority.page.goto('/club/space');
+    await expect(authority.page.getByText(said)).toBeVisible(); // the authority reads the discussion
+    await authority.page.getByLabel('Post as').selectOption('announcement');
+    await authority.page.getByLabel('Write a post').fill(note);
+    await authority.page.getByRole('button', { name: 'Post', exact: true }).click();
+    await expect(authority.page.getByText(note)).toBeVisible();
+    await expect(authority.page.getByText('Arjun Kumar').first()).toBeVisible(); // in the member list
+
+    await student.page.reload();
+    await expect(student.page.getByText(note)).toBeVisible();
+    await expect(student.page.getByText('Announcement').first()).toBeVisible();
+
+    // the server keeps other clubs out, even when the screen is bypassed
+    const other = await as(browser, 'club', /Google Developer Student Clubs/);
+    const r = await other.page.evaluate(async () => {
+      const t = (
+        await (await fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' })).json()
+      ).data.accessToken;
+      const res = await fetch('/api/v1/gov/clubs/robotics/space', {
+        headers: { Authorization: 'Bearer ' + t, 'X-Portal': 'club' },
+      });
+      return res.status;
+    });
+    expect(r).toBe(403);
+    for (const c of [student, authority, other]) await c.context.close();
   });
 });
 

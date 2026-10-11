@@ -252,13 +252,48 @@ describe('club applications', () => {
   });
 });
 
+describe('club space', () => {
+  it('a student joins a club, sees its space, and posts; the authority announces; a stranger is kept out', async () => {
+    const user = userEvent.setup();
+    mount('STU2026001', '/student/clubs');
+    const card = (await screen.findAllByText('Hut Labs'))[0].closest('article');
+    await user.click(within(card).getByRole('button', { name: /View club/ }));
+    await user.click(await screen.findByRole('button', { name: /Join club/ }));
+    expect(await screen.findByText(/You are a member/)).toBeTruthy();
+
+    mount('STU2026001', '/student/club-space?club=robotics');
+    expect(await screen.findByText('Hut Labs space')).toBeTruthy();
+    await user.type(screen.getByLabelText('Write a message'), 'Who is bringing a soldering iron?');
+    await user.click(screen.getByRole('button', { name: /^Post$/ }));
+    expect(await screen.findByText('Who is bringing a soldering iron?')).toBeTruthy();
+
+    mount('CLUB002', '/club/space');
+    expect(await screen.findByText('Who is bringing a soldering iron?')).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Post as'), 'announcement');
+    await user.type(screen.getByLabelText('Write a post'), 'Arena rehearsal moves to 5 PM.');
+    await user.click(screen.getByRole('button', { name: /^Post$/ }));
+    expect(await screen.findByText('Arena rehearsal moves to 5 PM.')).toBeTruthy();
+    expect(screen.getAllByText('Announcement').length).toBeGreaterThan(0);
+
+    mount('STU2026001', '/student/club-space?club=robotics');
+    expect(await screen.findByText('Arena rehearsal moves to 5 PM.')).toBeTruthy();
+  });
+
+  it('shows an empty state with a way to find clubs when no club has been joined', async () => {
+    const user = userEvent.setup();
+    mount('STU2026001', '/student/club-space');
+    await user.click(await screen.findByRole('button', { name: /^Leave / }));
+    expect(await screen.findByText('You have not joined a club yet', {}, { timeout: 4000 })).toBeTruthy();
+  });
+});
+
 describe('route sweep (no crashes / console errors)', () => {
   const sweep = {
     OSA001: ['dashboard', 'requests', 'requests/REQ-1244', 'requests/REQ-1255', 'requests/REQ-1048', 'requests/REQ-0987', 'physical', 'promotions', 'club-applications', 'club-applications/CA-501', 'club-applications/CA-504', 'clubs', 'clubs/innovation', 'clubs/robotics', 'reports', 'settings'].map((p) => `/admin/osa/${p}`),
     EVT001: ['dashboard', 'halls', 'halls?tab=approved', 'halls/REQ-1210', 'halls/REQ-1048', 'clubs/green', 'reports', 'settings'].map((p) => `/admin/events/${p}`),
-    CLUB001: ['dashboard', 'profile', 'members', 'requests', 'requests/new', 'requests/REQ-1262', 'requests/REQ-1262/edit', 'requests/REQ-1048', 'requests/REQ-1251', 'promotions', 'events', 'settings'].map((p) => `/club/${p}`),
+    CLUB001: ['dashboard', 'profile', 'members', 'space', 'requests', 'requests/new', 'requests/REQ-1262', 'requests/REQ-1262/edit', 'requests/REQ-1048', 'requests/REQ-1251', 'promotions', 'events', 'settings'].map((p) => `/club/${p}`),
     CLUB002: ['dashboard', 'requests/REQ-1255', 'promotions', 'events'].map((p) => `/club/${p}`),
-    STU2026001: ['dashboard', 'events', 'calendar', 'registrations', 'clubs', 'start-club', 'favorites', 'notifications', 'assistant', 'profile', 'settings'].map((p) => `/student/${p}`),
+    STU2026001: ['dashboard', 'events', 'calendar', 'registrations', 'clubs', 'club-space', 'start-club', 'favorites', 'notifications', 'assistant', 'profile', 'settings'].map((p) => `/student/${p}`),
   };
   for (const [uid, paths] of Object.entries(sweep)) {
     it(`${uid} renders ${paths.length} routes`, async () => {

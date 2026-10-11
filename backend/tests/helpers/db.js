@@ -26,6 +26,8 @@ export async function createTestDb() {
 }
 
 export const TABLES_IN_CLEAN_ORDER = [
+  'gov_club_posts',
+  'gov_club_members',
   'gov_files',
   'gov_user_state',
   'gov_registrations',
