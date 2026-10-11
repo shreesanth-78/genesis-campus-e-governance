@@ -52,3 +52,7 @@ Browser (frontend)  <->  Express API (backend)  <->  PostgreSQL (Neon)
 2. **Context:** the backend builds the pieces a model may use: one entry per club (what it is for, interest keywords), interest and group lists, process notes for the caller's role, upcoming events with live seat counts, and (club or admin) their own requests or the review queue. Keyword overlap ranks them (a light RAG, no vector database).
 3. **Model:** with a key (`backend/src/lib/llm.js`: Groq or Claude) the model gets the ranked pieces as untrusted data and a strict system prompt; if it still judges the message off-topic it answers OFF_TOPIC, which becomes the refusal.
 4. **Fallback:** with no key, or if the model fails, the rule-based answers in `shared/src/gov/ai.js` use the same knowledge.
+
+## Serving the website
+
+`backend/src/app.js` serves `frontend/dist` (override with `FRONTEND_DIST`) after the API routes: files under `/assets` are cached for a year (Vite fingerprints them), `index.html` is never cached, and any other non-`/api` path gets `index.html` so client-side routing and deep links work. Unknown `/api/*` paths still return a JSON 404. If `frontend/dist` does not exist (local development) the backend serves only the API and Vite serves the website.

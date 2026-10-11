@@ -29,14 +29,20 @@ export async function registrationCounts(db) {
 }
 
 /** Poster URLs are stored as `/api/v1/files/:id`; the browser gets them absolute so a separate frontend can show them. */
-const withAbsoluteFiles = (view) => ({
-  ...view,
-  requests: view.requests.map((r) =>
-    r.poster?.dataUrl?.startsWith(FILE_PATH)
-      ? { ...r, poster: { ...r.poster, dataUrl: `${config.API_URL.replace(/\/$/, '')}${r.poster.dataUrl}` } }
-      : r,
-  ),
-});
+const withAbsoluteFiles = (view) =>
+  !config.API_URL
+    ? view
+    : {
+        ...view,
+        requests: view.requests.map((r) =>
+          r.poster?.dataUrl?.startsWith(FILE_PATH)
+            ? {
+                ...r,
+                poster: { ...r.poster, dataUrl: `${config.API_URL.replace(/\/$/, '')}${r.poster.dataUrl}` },
+              }
+            : r,
+        ),
+      };
 
 /** The state a given portal may see, with live seat counts. */
 export async function buildView(db, state, portal, actor) {

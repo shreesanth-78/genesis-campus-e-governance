@@ -313,9 +313,15 @@ describe('posters and documents', () => {
     const id = (await club.act('saveRequest', goodRequest({ title: 'Poster File Night' }), { submit: true }))
       .body.data.extra.id;
     const r = (await club.get('/gov/state')).body.data.requests.find((x) => x.id === id);
-    expect(r.poster.dataUrl).toMatch(/^https?:\/\/[^/]+\/api\/v1\/files\/[\w-]+$/);
+    // relative by default: the backend serves the website too
+    expect(r.poster.dataUrl).toMatch(/^\/api\/v1\/files\/[\w-]+$/);
+    // a separately hosted website gets absolute links
+    overrideConfig({ API_URL: 'https://api.example.com/' });
+    const abs = (await club.get('/gov/state')).body.data.requests.find((x) => x.id === id);
+    expect(abs.poster.dataUrl).toBe(`https://api.example.com${r.poster.dataUrl}`);
+    overrideConfig({ API_URL: '' });
     expect(JSON.stringify(r.documents)).not.toContain('base64');
-    const file = await request(app).get(new URL(r.poster.dataUrl).pathname);
+    const file = await request(app).get(new URL(r.poster.dataUrl, 'http://x').pathname);
     expect(file.headers['content-type']).toBe('image/png');
     expect(file.headers['cross-origin-resource-policy']).toBe('cross-origin');
     expect(file.status).toBe(200);

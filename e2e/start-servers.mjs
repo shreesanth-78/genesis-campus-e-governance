@@ -14,7 +14,7 @@ const apiEnv = {
   NODE_ENV: 'development',
   PORT: '4100',
   WEB_URL: 'http://localhost:5273',
-  API_URL: 'http://localhost:4100',
+  API_URL: '',
   LOG_LEVEL: 'warn',
   DATABASE_CLIENT: 'sqlite3',
   DATABASE_URL: '',

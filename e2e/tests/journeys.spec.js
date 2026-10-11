@@ -273,7 +273,7 @@ test.describe('E2E-03 the approval path, role by role', () => {
       ).data;
       return st.requests.find((r) => r.id === reqId)?.poster?.dataUrl;
     }, id);
-    expect(posterUrl).toMatch(/^https?:\/\/[^/]+\/api\/v1\/files\/[\w-]+$/);
+    expect(posterUrl).toMatch(/^(https?:\/\/[^/]+)?\/api\/v1\/files\/[\w-]+$/);
     expect((await student.page.request.get(posterUrl)).status()).toBe(200);
 
     for (const c of [club, events, osa, student]) await c.context.close();

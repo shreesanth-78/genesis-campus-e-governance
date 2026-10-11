@@ -191,7 +191,7 @@ flowchart LR
 **What each portal receives is decided by the server.** Students get published events only. A club gets its own requests in full and other clubs' pending requests only as a time slot (so venue clashes still show). Administrators get everything.
 
 ```
-frontend/   React 18 + Vite + Tailwind. A static site (Vercel, Netlify...).
+frontend/   React 18 + Vite + Tailwind. Built into frontend/dist and served by the backend (or any static host).
 backend/    Node 20 + Express + Knex on PostgreSQL (Neon). Auth, governance module, AI services.
 shared/     Workflow engine, permissions, club knowledge, notification copy, per-portal views, sample data.
 e2e/        Playwright journeys that drive a real browser against the real backend.
@@ -261,27 +261,31 @@ Optional AI: set `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`) in `backend/.env`. With
 
 ## 11. Deployment
 
-### Live deployment
+### How it is deployed
 
-| Part         | Where                                                  | Notes                                                                                                                                                   |
-| ------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Website**  | Vercel: https://genesis-campus-e-governance.vercel.app | Builds `frontend/`; `frontend/vercel.json` sends every page to the single-page app and forwards `/api/*` to the API, so the browser talks to one origin |
-| **API**      | Render (Node service)                                  | Runs `backend/`; applies database migrations on start; AI key and secrets are environment variables, never in the repo                                  |
-| **Database** | Neon (PostgreSQL)                                      | One database for users, requests, approvals, seats and posters                                                                                          |
+**One service, one URL.** The Node backend serves the API under `/api/*` **and** the built website for every other path, on Render, with the database on Neon. A frontend change is shipped by the same build step, so the website and the API always update together (no separate website host, no CORS, no cross-site cookies).
 
 ```mermaid
 flowchart LR
-    J[Jury browser] --> V[Vercel<br/>React site]
-    V -- /api/* rewrite --> R[Render<br/>Express API]
-    R --> N[(Neon PostgreSQL)]
-    R -. optional .-> G[Groq / Claude]
+    J[Jury browser] --> R[Render web service<br/>Express]
+    R -- /api/* --> API[Auth, governance, AI]
+    R -- everything else --> W[Built React website<br/>frontend/dist]
+    API --> N[(Neon PostgreSQL)]
+    API -. optional .-> G[Groq / Claude]
 ```
 
-Health check: https://genesis-campus-e-governance.vercel.app/api/v1/health should answer `{"data":{"status":"ok","database":"up"}}`.
+|           | Setting                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------- |
+| Build     | `npm install --include=dev && npm run build` (installs everything and builds the website) |
+| Start     | `npm start -w backend`                                                                    |
+| Health    | `/api/v1/health` answers `{"data":{"status":"ok","database":"up"}}`                       |
+| Blueprint | [`render.yaml`](render.yaml) describes the service for one-click setup                    |
+
+The live demo link at the top of this README is the deployed instance. The same build can also be hosted with the website on Vercel (`frontend/vercel.json`) forwarding `/api` to the backend; see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ### Deploying your own copy
 
-Designed as two independent deployables plus a managed database: **frontend** on Vercel or Netlify (`frontend/vercel.json` is included and forwards `/api` to the backend), **backend** on Render, Railway or Fly (`npm start -w backend`), **database** on Neon. Environment variables, the cross-domain cookie setup and a checklist are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Create a Neon database, then a Render **Web Service** from this repository using the build and start commands above (or the `render.yaml` Blueprint) and set the environment variables listed in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): at minimum `DATABASE_URL`, `JWT_SECRET` and `NODE_ENV=production`. `GROQ_API_KEY` is optional. The guide also covers updating the live site, quick post-deploy checks and the optional two-domain setup.
 
 ## 12. Team
 

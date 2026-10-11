@@ -1,0 +1,32 @@
+# Render Blueprint: ONE web service that runs the API and also serves the built website, so the whole product lives
+# at a single URL. Build installs everything (the website needs its build tools), builds the frontend into
+# frontend/dist, and the backend serves it. Redeploy = the website and the API update together.
+services:
+  - type: web
+    name: genesis-campus-connect
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start -w backend
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_CLIENT
+        value: pg
+      - key: DATABASE_URL # the Neon connection string
+        sync: false
+      - key: JWT_SECRET # 32+ random characters
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 2h
+      - key: REFRESH_TTL_DAYS
+        value: 0.0833333
+      - key: AUTO_VERIFY_EMAIL
+        value: false
+      - key: SEED_DEMO_PORTAL
+        value: false
+      - key: GROQ_API_KEY # optional: model-written chat answers and notification quotes
+        sync: false

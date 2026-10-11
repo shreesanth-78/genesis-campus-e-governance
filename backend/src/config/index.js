@@ -20,7 +20,9 @@ const schema = z.object({
   PORT: z.coerce.number().default(4000),
   // Browser origin(s) allowed to call the API, comma separated (the deployed frontend URL).
   WEB_URL: z.string().default('http://localhost:5173'),
-  API_URL: z.string().default('http://localhost:4000'),
+  // Public URL of this API, only needed when the website is served from a DIFFERENT domain (poster links become
+  // absolute). Leave empty when the backend serves the website itself: links stay relative.
+  API_URL: z.string().default(''),
   LOG_LEVEL: z.string().default('info'),
   APP_TIMEZONE: z.string().default('Asia/Kolkata'),
   // PostgreSQL (Neon) is the database. sqlite3 exists only for the automated tests and the end-to-end stack.

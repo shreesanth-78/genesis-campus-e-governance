@@ -16,3 +16,4 @@ process.env.WEB_URL = 'http://localhost:5173';
 // Tests never call a real model; the chatbot uses its built-in fallback unless a test injects a client.
 process.env.ANTHROPIC_API_KEY = '';
 process.env.GROQ_API_KEY = '';
+process.env.API_URL = ''; // poster links stay relative unless a test sets it
