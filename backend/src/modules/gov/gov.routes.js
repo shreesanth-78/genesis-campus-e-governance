@@ -157,9 +157,26 @@ aiRouter.get('/status', auth, (req, res) => res.json({ data: ai.status(llmFor(re
 aiRouter.post(
   '/duplicate-clubs',
   auth,
-  onlyPortals('osa', 'events'),
+  onlyPortals('osa'),
   validate({ body: z.object({ application: z.record(z.any()) }) }),
   wrap(async (req, res) => res.json({ data: await ai.duplicateClubs(db(req), req.body.application) })),
+);
+aiRouter.post(
+  '/check-club',
+  auth,
+  onlyPortals('student'),
+  validate({ body: z.object({ application: z.record(z.any()) }) }),
+  wrap(async (req, res) => {
+    const a = req.body.application;
+    const text = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+    const application = {
+      name: text(a.name, 100),
+      category: text(a.category, 80),
+      objectives: text(a.objectives, 1200),
+      description: text(a.description, 1200),
+    };
+    res.json({ data: await ai.clubIdeaCheck(db(req), application, { llm: llmFor(req) }) });
+  }),
 );
 aiRouter.post(
   '/assistant',
@@ -216,7 +233,7 @@ filesRouter.get(
 aiRouter.post(
   '/halls',
   auth,
-  onlyPortals('club', 'osa', 'events'),
+  onlyPortals('club', 'events'),
   validate({
     body: z.object({
       attendance: z.coerce.number().int().min(1).max(5000),

@@ -9,6 +9,7 @@ import { CLUB_APP_DOCS, REQUEST_DOCS, VENUES } from './govData.js';
 import {
   TODAY_ISO,
   allClubs,
+  clubProfile,
   findConflicts,
   fmtDate,
   fmtDateTime,
@@ -17,9 +18,19 @@ import {
   initialsOf,
 } from './selectors.js';
 import { newEventNotice } from './copy.js';
+import { CLUB_BLOCK_SCORE, duplicateSummary, localDuplicateCheck } from './ai.js';
 import { actorKey, can, deniedReason, ownsClub } from './permissions.js';
 
 const ROLE_SHORT = { osa: 'OSA', events: 'Events Section', club: 'Club Authority', student: 'Student' };
+const NO_HALL = {
+  status: 'none',
+  by: null,
+  at: null,
+  note: '',
+  requestedVenue: '',
+  priority: null,
+  registered: 0,
+};
 const fail = (state, error) => ({ ok: false, state, error });
 const ok = (state, extra = {}) => ({ ok: true, state, ...extra });
 
@@ -84,7 +95,6 @@ export function validateRequest(data, { draft = false } = {}) {
   if (!data.endTime) errors.endTime = 'Choose an end time.';
   if (data.startTime && data.endTime && toMin(data.endTime) <= toMin(data.startTime))
     errors.endTime = 'End time must be after the start time.';
-  if (!data.venue) errors.venue = 'Choose a venue.';
   const cap = Number(data.capacity);
   if (!Number.isInteger(cap) || cap < 5 || cap > 2000)
     errors.capacity = 'Enter expected attendance between 5 and 2000.';
@@ -124,7 +134,7 @@ function cleanRequestFields(data) {
     date: data.date || '',
     startTime: data.startTime || '',
     endTime: data.endTime || '',
-    venue: data.venue || '',
+    venue: '', // the hall is requested later, once the registrations are known
     capacity: Number(data.capacity) || 0,
     regDeadline: data.regDeadline || '',
     regDeadlineTime: data.regDeadlineTime || '18:00',
@@ -159,10 +169,6 @@ export function saveRequest(state, actor, data, { submit = false, id = null } = 
       status: submit ? 'submitted' : r.status,
       version: resubmitting ? r.version + 1 : r.version,
       submittedAt: submit ? at : r.submittedAt,
-      hall:
-        hallOf(r).status === 'approved' && r.venue === fields.venue
-          ? hallOf(r)
-          : { status: 'pending', by: null, at: null, note: '', requestedVenue: fields.venue },
       onlineReview: resubmitting ? { status: 'pending', by: null, at: null, note: '' } : r.onlineReview,
       physical:
         resubmitting && r.physical.status === 'issue'
@@ -200,7 +206,7 @@ export function saveRequest(state, actor, data, { submit = false, id = null } = 
     clubId: actor.clubId,
     ...fields,
     status: submit ? 'submitted' : 'draft',
-    hall: { status: 'pending', by: null, at: null, note: '', requestedVenue: fields.venue },
+    hall: { ...NO_HALL },
     onlineReview: { status: 'pending', by: null, at: null, note: '' },
     physical: { status: 'pending', by: null, at: null, receivedOn: null, refNo: '', note: '' },
     approval: null,
@@ -244,8 +250,6 @@ export function reviewRequest(state, actor, id, { decision, reasons = [], note =
 
   if (decision === 'clear') {
     if (cur.onlineReview.status === 'cleared') return fail(state, 'Online review is already cleared.');
-    if (hallOf(cur).status !== 'approved')
-      return fail(state, 'Give permission for the requested hall before clearing the online review.');
     next = mapRequest(next, id, (r) => ({
       ...r,
       onlineReview: { status: 'cleared', by: actor.name, at, note },
@@ -297,61 +301,130 @@ export function reviewRequest(state, actor, id, { decision, reasons = [], note =
   return fail(state, 'Unknown decision.');
 }
 
+export const HALL_PRIORITIES = ['high', 'medium', 'low'];
+
 /**
- * Permission for the hall the club asked for. decision:
- *  - 'approve'  the requested hall is fine;
- *  - 'reassign' give the club a different hall (it must hold the expected attendance and be free);
- *  - 'reject'   the hall cannot be used: the request goes back to the club for corrections (a reason is required).
+ * After OSA has given permission and the event has been circulated, the club authority knows how many students
+ * registered. It then asks the Events Section for a hall, saying how important this event is to the club (priority).
+ * `registered` is the live count the API supplies; the browser's value is ignored there.
+ */
+export function requestHall(
+  state,
+  actor,
+  id,
+  { venue, priority = 'medium', note = '', registered = 0 } = {},
+) {
+  const cur = state.requests.find((r) => r.id === id);
+  if (!cur) return fail(state, 'Request not found.');
+  if (!ownsClub(actor, cur.clubId))
+    return fail(state, 'You can only request a hall for your own club’s events.');
+  if (cur.status !== 'published')
+    return fail(
+      state,
+      'Circulate the event to students first: the hall is requested once registrations are coming in.',
+    );
+  const current = hallOf(cur).status;
+  if (current === 'approved') return fail(state, 'A hall is already allocated.');
+  if (current === 'requested') return fail(state, 'A hall request is already with the Events Section.');
+  const v = VENUES.find((x) => x.name === venue);
+  if (!v) return fail(state, 'Choose one of the listed halls.');
+  if (!HALL_PRIORITIES.includes(priority)) return fail(state, 'Choose a priority.');
+  const people = Math.max(Number(registered) || 0, 0);
+  const attendance = people || cur.capacity;
+  if (v.capacity < attendance)
+    return fail(
+      state,
+      `${v.name} holds ${v.capacity}, fewer than the ${attendance} ${people ? 'registered' : 'expected'}.`,
+    );
+  if (findConflicts(state, { ...cur, venue: v.name }).length)
+    return fail(state, `${v.name} is already allocated at an overlapping time.`);
+  const at = tick(state);
+  let next = mapRequest({ ...state, clock: at }, id, (r) => ({
+    ...r,
+    hall: {
+      status: 'requested',
+      by: actor.name,
+      requestedBy: actor.name,
+      at,
+      note: note.trim(),
+      requestedVenue: v.name,
+      priority,
+      registered: people,
+    },
+    history: [
+      ...r.history,
+      entry(at, actor, 'Hall requested', `${v.name} · ${priority} priority · ${people} registered`),
+    ],
+  }));
+  next = withActivity(next, at, actor, `requested ${v.name} for “${cur.title}”`, {
+    kind: 'request',
+    refType: 'request',
+    refId: id,
+    clubId: cur.clubId,
+  });
+  return ok(next);
+}
+
+/**
+ * The Events Section's decision on a hall request. decision:
+ *  - 'approve'  allocate the hall the club asked for;
+ *  - 'reassign' allocate a different hall (it must hold the registered crowd and be free);
+ *  - 'reject'   the hall cannot be given (a reason is required); the club can request again.
  */
 export function reviewHall(state, actor, id, { decision, venue = '', note = '' }) {
   if (!can(actor, 'request.hall')) return fail(state, deniedReason('request.hall'));
   const cur = state.requests.find((r) => r.id === id);
   if (!cur) return fail(state, 'Request not found.');
-  if (cur.status !== 'submitted') return fail(state, 'The hall can only be decided for submitted requests.');
+  const hall = hallOf(cur);
+  if (hall.status !== 'requested') return fail(state, 'The club has not asked for a hall for this event.');
   if (!['approve', 'reassign', 'reject'].includes(decision)) return fail(state, 'Unknown decision.');
   const at = tick(state);
-  const requested = hallOf(cur).requestedVenue || cur.venue;
+  const requested = hall.requestedVenue;
+  const keep = {
+    requestedVenue: requested,
+    priority: hall.priority,
+    registered: hall.registered,
+    requestedBy: hall.requestedBy,
+  };
 
   if (decision === 'reject') {
-    if (!note.trim()) return fail(state, 'Tell the club why the hall cannot be used.');
-    const sent = reviewRequest(state, actor, id, {
-      decision: 'correction',
-      reasons: ['Hall not approved'],
-      note,
-    });
-    if (!sent.ok) return sent;
-    const next = mapRequest(sent.state, id, (r) => ({
+    if (!note.trim()) return fail(state, 'Tell the club why the hall cannot be given.');
+    let next = mapRequest({ ...state, clock: at }, id, (r) => ({
       ...r,
-      hall: { status: 'rejected', by: actor.name, at, note, requestedVenue: requested },
-      history: [...r.history, entry(at, actor, 'Hall not approved', `${r.venue}: ${note}`)],
+      venue: '',
+      hall: { status: 'rejected', by: actor.name, at, note, ...keep },
+      history: [...r.history, entry(at, actor, 'Hall not given', `${requested}: ${note}`)],
     }));
+    next = withActivity(next, at, actor, `could not give the hall for “${cur.title}”`, {
+      kind: 'request',
+      refType: 'request',
+      refId: id,
+      clubId: cur.clubId,
+    });
     return ok(next);
   }
 
-  let assigned = cur.venue;
+  let assigned = requested;
   if (decision === 'reassign') {
-    const v = VENUES.find((x) => x.name === venue);
-    if (!v) return fail(state, 'Choose one of the listed halls.');
-    if (v.name === cur.venue) return fail(state, 'That is already the requested hall. Use Approve.');
-    if (v.capacity < cur.capacity)
-      return fail(state, `${v.name} holds ${v.capacity}, fewer than the ${cur.capacity} expected.`);
-    if (findConflicts(state, { ...cur, venue: v.name }).length)
-      return fail(state, `${v.name} is already requested at an overlapping time.`);
-    assigned = v.name;
+    if (venue === requested) return fail(state, 'That is the hall the club asked for. Use Approve.');
+    assigned = venue;
   }
-  const label = decision === 'approve' ? 'Hall approved' : 'Hall changed';
-  const detail = decision === 'approve' ? cur.venue : `${requested} -> ${assigned}${note ? `: ${note}` : ''}`;
+  const v = VENUES.find((x) => x.name === assigned);
+  if (!v) return fail(state, 'Choose one of the listed halls.');
+  const attendance = hall.registered || cur.capacity;
+  if (v.capacity < attendance)
+    return fail(state, `${v.name} holds ${v.capacity}, fewer than the ${attendance} expected.`);
+  if (findConflicts(state, { ...cur, venue: v.name }).length)
+    return fail(state, `${v.name} is already allocated at an overlapping time.`);
+  const label = decision === 'approve' ? 'Hall allocated' : 'Different hall allocated';
+  const detail = decision === 'approve' ? v.name : `${requested} -> ${v.name}${note ? `: ${note}` : ''}`;
   let next = mapRequest({ ...state, clock: at }, id, (r) => ({
     ...r,
-    venue: assigned,
-    hall: { status: 'approved', by: actor.name, at, note, requestedVenue: requested },
+    venue: v.name,
+    hall: { status: 'approved', by: actor.name, at, note, ...keep },
     history: [...r.history, entry(at, actor, label, detail)],
   }));
-  const what =
-    decision === 'approve'
-      ? `approved the hall for “${cur.title}”`
-      : `assigned ${assigned} to “${cur.title}”`;
-  next = withActivity(next, at, actor, what, {
+  next = withActivity(next, at, actor, `allocated ${v.name} to “${cur.title}”`, {
     kind: 'request',
     refType: 'request',
     refId: id,
@@ -405,8 +478,6 @@ export function finalApprove(state, actor, id, { note = '' } = {}) {
     return fail(state, 'Online review must be cleared before final approval.');
   if (cur.physical.status !== 'verified')
     return fail(state, 'The hard-copy letter must be verified before final approval.');
-  if (hallOf(cur).status !== 'approved')
-    return fail(state, 'The hall must be approved before final approval.');
   const at = tick(state);
   let next = mapRequest({ ...state, clock: at }, id, (r) => ({
     ...r,
@@ -423,12 +494,15 @@ export function finalApprove(state, actor, id, { note = '' } = {}) {
   return ok(next);
 }
 
-/** Publish an approved event to the Student Dashboard and notify students. */
+/** Circulate an event OSA has given permission for: it appears on the Student Dashboard, students are notified and can register. */
 export function publishRequest(state, actor, id, { quote } = {}) {
-  if (!can(actor, 'request.publish')) return fail(state, deniedReason('request.publish'));
   const cur = state.requests.find((r) => r.id === id);
   if (!cur) return fail(state, 'Request not found.');
-  if (cur.status !== 'approved') return fail(state, 'Only OSA-approved events can be published.');
+  // Once OSA has given permission, the club itself circulates the event on the portal (OSA may do it too).
+  if (!ownsClub(actor, cur.clubId) && !can(actor, 'request.publish'))
+    return fail(state, deniedReason('request.publish'));
+  if (cur.status !== 'approved')
+    return fail(state, 'Only events OSA has given permission for can be circulated.');
   const at = tick(state);
   const club = allClubs(state).find((c) => c.id === cur.clubId);
   const bc = nextId(state, 'notice', 'bc-');
@@ -442,7 +516,7 @@ export function publishRequest(state, actor, id, { quote } = {}) {
       category: cur.category,
       clubName: club?.name || 'A club',
       when: `${fmtDate(cur.date)}, ${fmt12(cur.startTime)}`,
-      venue: cur.venue,
+      venue: cur.venue || 'a hall announced soon',
       capacity: cur.capacity,
       deadline: fmtDate(cur.regDeadline),
       seed: cur.id,
@@ -620,6 +694,117 @@ export function createClubApplication(state, actor, data) {
   };
   let next = { ...state, clock: at, counters, clubApplications: [app, ...state.clubApplications] };
   next = withActivity(next, at, actor, `logged club application “${app.name}”`, {
+    kind: 'club',
+    refType: 'clubApp',
+    refId: id,
+    clubId: null,
+  });
+  return ok(next, { id });
+}
+
+/**
+ * Compares a proposed club with every existing club and with applications still waiting for a decision.
+ * `blocked` is the message to show when the same focus area is already covered (empty when the idea is new).
+ */
+export function checkClubIdea(state, form) {
+  const waiting = state.clubApplications
+    .filter((a) => ['submitted', 'correction_requested'].includes(a.status))
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      category: a.category,
+      tag: '',
+      blurb: a.objectives,
+      application: true,
+    }));
+  const objectivesOf = (c) => (c.application ? '' : (clubProfile(state, c.id).objectives ?? []).join(' '));
+  const matches = localDuplicateCheck(form, [...allClubs(state), ...waiting], objectivesOf);
+  const top = matches[0];
+  let blocked = '';
+  if (top && top.score >= CLUB_BLOCK_SCORE) {
+    blocked = waiting.some((w) => w.id === top.clubId)
+      ? `Another application (“${top.name}”) already covers this idea. Join forces with them instead.`
+      : `“${top.name}” already covers this focus area (${Math.round(top.score * 100)}% similar). Join that club instead, or propose something different.`;
+  }
+  return { matches, blocked, summary: duplicateSummary(matches) };
+}
+
+/**
+ * A student proposes a new club. Before anything is recorded the idea is compared with every existing club and with
+ * applications still waiting for a decision: if the same focus area is already covered the application is refused and
+ * the student is pointed to that club. A new idea goes to OSA, who decides.
+ * `semantic` is the model's judgement from the API ({ similar, club, reason }); the browser's own value is ignored there.
+ */
+export function applyForClub(state, actor, data, { semantic = null } = {}) {
+  if (!can(actor, 'clubApp.apply')) return fail(state, 'Only students can apply to start a club.');
+  const form = {
+    ...data,
+    proposerName: actor.name,
+    proposerEmail: actor.email,
+    proposerRoll: actor.userId,
+    proposerDept: actor.department || actor.shortDept || '',
+  };
+  const errors = validateClubApplication(form);
+  if (Object.keys(errors).length) return fail(state, Object.values(errors)[0]);
+  if (Number(form.memberCount) < 10) return fail(state, 'A new club needs at least 10 founding members.');
+  if (
+    state.clubApplications.some(
+      (a) =>
+        a.proposer.rollNo === actor.userId &&
+        a.status === 'submitted' &&
+        a.name.toLowerCase() === form.name.trim().toLowerCase(),
+    )
+  )
+    return fail(state, 'You have already applied for this club. It is waiting for OSA.');
+
+  const { matches, blocked } = checkClubIdea(state, form);
+  if (blocked) return fail(state, blocked);
+  if (semantic?.similar && semantic.club)
+    return fail(
+      state,
+      `“${semantic.club}” already covers this idea${semantic.reason ? `: ${semantic.reason}` : '.'} Join that club instead, or propose something different.`,
+    );
+
+  const at = tick(state);
+  const { id, counters } = nextId(state, 'clubApp', 'CA-');
+  const app = {
+    id,
+    name: form.name.trim(),
+    category: form.category,
+    objectives: form.objectives.trim(),
+    description: (form.description || '').trim(),
+    proposer: {
+      name: actor.name,
+      rollNo: actor.userId,
+      dept: form.proposerDept,
+      email: actor.email,
+      userId: actor.id,
+    },
+    advisor: form.advisor.trim(),
+    memberCount: Number(form.memberCount),
+    documents: form.documents || {},
+    status: 'submitted',
+    decisionNote: '',
+    submittedAt: at,
+    aiCheck: {
+      source: semantic ? 'ai-service' : 'local-mock',
+      ranAt: at,
+      matches,
+      summary: duplicateSummary(matches),
+      acknowledged: false,
+      checkedAtApply: true,
+    },
+    history: [
+      entry(
+        at,
+        actor,
+        'Student applied to start a club',
+        `${matches.length} similar club(s) found, none close enough to block`,
+      ),
+    ],
+  };
+  let next = { ...state, clock: at, counters, clubApplications: [app, ...state.clubApplications] };
+  next = withActivity(next, at, actor, `applied to start the club “${app.name}”`, {
     kind: 'club',
     refType: 'clubApp',
     refId: id,

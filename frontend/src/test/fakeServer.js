@@ -24,7 +24,7 @@ export function createFakeServer() {
   const sessions = new Map(); // token -> { user, portal }
 
   const portalOf = (u) => (u.role === 'admin' ? u.adminType : u.role);
-  const actorOf = ({ password: _p, ...u }) => u;
+  const actorOf = ({ password: _p, ...u }) => ({ ...u, id: u.userId });
   const studentOf = (id) => (students[id] ??= structuredClone(DEMO_STUDENT_STATE));
   const counts = () => {
     const c = {};
@@ -36,7 +36,7 @@ export function createFakeServer() {
     return c;
   };
   const view = (portal, actor) =>
-    viewFor({ ...state, registrationCounts: counts() }, portal, { clubId: actor.clubId });
+    viewFor({ ...state, registrationCounts: counts() }, portal, { clubId: actor.clubId, userId: actor.id });
 
   async function handle(url, init = {}) {
     const method = init.method ?? 'GET';
@@ -72,7 +72,11 @@ export function createFakeServer() {
     if (path === '/gov/state') return json(view(session.portal, actor));
     if (path.startsWith('/gov/actions/')) {
       const name = path.split('/').pop();
-      const res = workflow[name](state, actor, ...body.args);
+      const args = [...body.args];
+      // like the server, the registered count comes from the registrations, not from the browser
+      if (name === 'requestHall')
+        args[1] = { ...args[1], registered: counts()[`evt-${String(args[0]).toLowerCase()}`] ?? 0 };
+      const res = workflow[name](state, actor, ...args);
       if (res.ok) state = res.state;
       const { ok, error, state: _s, ...extra } = res;
       return json({ ok, error: ok ? undefined : error, extra, state: view(session.portal, actor) });

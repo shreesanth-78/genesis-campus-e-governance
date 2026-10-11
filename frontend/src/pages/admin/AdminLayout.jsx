@@ -13,21 +13,30 @@ export default function AdminLayout() {
   const stats = useMemo(() => adminStats(state), [state]);
   const base = adminBase(user);
   const isOsa = user?.adminType === 'osa';
-  const nav = [
-    { to: `${base}/dashboard`, label: 'Overview', icon: 'LayoutGrid' },
-    { to: `${base}/requests`, label: 'Event Requests', icon: 'ClipboardList', count: stats.pendingOnline + stats.readyForApproval + stats.readyToPublish },
-    { to: `${base}/physical`, label: 'Hard-copy Checks', icon: 'FileCheck2', count: stats.awaitingPhysical },
-    { to: `${base}/promotions`, label: 'Promotion Requests', icon: 'Megaphone', count: stats.pendingPromotions },
-    { to: `${base}/club-applications`, label: 'Club Applications', icon: 'UserPlus', count: stats.clubApps },
-    { to: `${base}/clubs`, label: 'Club Directory', icon: 'Users' },
-    { to: `${base}/reports`, label: 'Reports', icon: 'BarChart3' },
-    { to: `${base}/settings`, label: 'Settings', icon: 'Settings' },
-  ];
+  // OSA reviews event requests, gives permission and decides new clubs; the Events Section only allocates halls.
+  const nav = isOsa
+    ? [
+        { to: `${base}/dashboard`, label: 'Overview', icon: 'LayoutGrid' },
+        { to: `${base}/requests`, label: 'Event Requests', icon: 'ClipboardList', count: stats.pendingOnline + stats.readyForApproval },
+        { to: `${base}/physical`, label: 'Hard-copy Checks', icon: 'FileCheck2', count: stats.awaitingPhysical },
+        { to: `${base}/promotions`, label: 'Promotion Requests', icon: 'Megaphone', count: stats.pendingPromotions },
+        { to: `${base}/club-applications`, label: 'Club Applications', icon: 'UserPlus', count: stats.clubApps },
+        { to: `${base}/clubs`, label: 'Club Directory', icon: 'Users' },
+        { to: `${base}/reports`, label: 'Reports', icon: 'BarChart3' },
+        { to: `${base}/settings`, label: 'Settings', icon: 'Settings' },
+      ]
+    : [
+        { to: `${base}/dashboard`, label: 'Overview', icon: 'LayoutGrid' },
+        { to: `${base}/halls`, label: 'Hall Requests', icon: 'Building2', count: stats.hallRequests },
+        { to: `${base}/clubs`, label: 'Club Directory', icon: 'Users' },
+        { to: `${base}/reports`, label: 'Reports', icon: 'BarChart3' },
+        { to: `${base}/settings`, label: 'Settings', icon: 'Settings' },
+      ];
   return (
     <PortalShell
       nav={nav}
       sectionLabel={isOsa ? 'OSA Console' : 'Events Section'}
-      footerNote={isOsa ? 'You can grant final approval and decide club applications.' : 'You review and verify requests and publish approved events. Final approval stays with OSA.'}
+      footerNote={isOsa ? 'You review event requests, give permission to circulate them and decide new-club applications.' : 'You allocate halls to events once clubs have registrations. Reviews and approvals stay with OSA.'}
     />
   );
 }

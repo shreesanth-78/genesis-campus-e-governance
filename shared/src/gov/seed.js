@@ -504,19 +504,40 @@ const RAW_REQUESTS = [
   })),
 ];
 
-// Hall permission of the sample requests: approved once a request is past review, pending otherwise.
+// Hall of the sample requests. A hall is requested after an event has been circulated and OSA's permission is given, and
+// the Events Section allocates it, so events already live have one; REQ-1210 shows a request waiting for the Events
+// Section, and everything earlier in the process has no hall yet.
 export const SEED_REQUESTS = RAW_REQUESTS.map((r) => {
-  const approved =
-    r.onlineReview.status === 'cleared' || ['approved', 'published', 'completed'].includes(r.status);
+  const live = ['published', 'completed'].includes(r.status);
+  if (r.id === 'REQ-1210') {
+    return {
+      ...r,
+      venue: '',
+      hall: {
+        status: 'requested',
+        by: 'Coding Club authority',
+        at: '2026-10-09T10:00:00',
+        note: 'Mostly third-year students; laptops needed.',
+        requestedVenue: r.venue,
+        priority: 'high',
+        registered: 38,
+      },
+    };
+  }
   return {
     ...r,
-    hall: {
-      status: approved ? 'approved' : 'pending',
-      by: approved ? r.onlineReview.by : null,
-      at: approved ? r.onlineReview.at : null,
-      note: '',
-      requestedVenue: r.venue,
-    },
+    venue: live ? r.venue : '',
+    hall: live
+      ? {
+          status: 'approved',
+          by: r.publication?.by ?? r.onlineReview.by,
+          at: r.publication?.at ?? r.onlineReview.at,
+          note: '',
+          requestedVenue: r.venue,
+          priority: 'medium',
+          registered: 0,
+        }
+      : { status: 'none', by: null, at: null, note: '', requestedVenue: '', priority: null, registered: 0 },
   };
 });
 

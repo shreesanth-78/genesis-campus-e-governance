@@ -12,6 +12,7 @@ import { errors } from '../../lib/errors.js';
 import { config } from '../../config/index.js';
 import { saveImage } from './files.service.js';
 import { eventQuote } from './quote.service.js';
+import { semanticClubCheck } from './similarity.service.js';
 import { loadState, lockState, saveState } from './state.js';
 import { portalUser } from './portal.js';
 
@@ -47,7 +48,7 @@ const withAbsoluteFiles = (view) =>
 /** The state a given portal may see, with live seat counts. */
 export async function buildView(db, state, portal, actor) {
   const full = { ...state, registrationCounts: await registrationCounts(db) };
-  return withAbsoluteFiles(viewFor(full, portal, { clubId: actor?.clubId }));
+  return withAbsoluteFiles(viewFor(full, portal, { clubId: actor?.clubId, userId: actor?.id }));
 }
 
 export async function getView(db, user, portal) {
@@ -128,7 +129,11 @@ async function prepareArgs(db, name, rawArgs) {
     args[1] = bounded(args[1] ?? {});
     return args;
   }
-  if (name === 'createClubApplication' && args[0] && typeof args[0] === 'object') {
+  if (
+    (name === 'createClubApplication' || name === 'applyForClub') &&
+    args[0] &&
+    typeof args[0] === 'object'
+  ) {
     const { documents, ...rest } = args[0];
     args[0] = { ...bounded(rest), documents: cleanDocuments(documents) };
     return args;
@@ -148,6 +153,13 @@ function duplicateCheckFor(state, applicationId) {
     matches,
     summary: duplicateSummary(matches),
   };
+}
+
+/** The model's verdict on whether a proposed club repeats an existing one, or null (the rule-based check still runs). */
+async function semanticFor(db, llm, application) {
+  if (!llm || !application || typeof application !== 'object') return null;
+  const state = await loadState(db);
+  return semanticClubCheck(llm, application, selectors.allClubs(state));
 }
 
 /** The model's hook line for the event about to be published, or null (the static quote is used then). */
@@ -179,6 +191,16 @@ export async function runAction(db, user, portal, name, rawArgs, { llm = null } 
   // Publishing sends students a notification. The chat model writes an event-specific hook line for it (before the
   // transaction, so no lock is held while waiting); the browser's own options are ignored.
   if (name === 'publishRequest') args[1] = { quote: await quoteFor(db, llm, args[0]) };
+  // A student's new-club idea is also judged by the model for meaning; whatever the browser sent as options is ignored.
+  // The hall request records how many students have registered; the count comes from the database, not the browser.
+  if (name === 'requestHall' && typeof args[0] === 'string') {
+    const counts = await registrationCounts(db);
+    args[1] = {
+      ...(args[1] && typeof args[1] === 'object' ? args[1] : {}),
+      registered: counts[`evt-${args[0].toLowerCase()}`] ?? 0,
+    };
+  }
+  if (name === 'applyForClub') args[1] = { semantic: await semanticFor(db, llm, args[0]) };
 
   return db.transaction(async (trx) => {
     await lockState(trx);

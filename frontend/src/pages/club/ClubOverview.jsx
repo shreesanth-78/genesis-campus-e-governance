@@ -50,7 +50,7 @@ export default function ClubOverview() {
           </Card>
           <Card title="Upcoming published events" action={<Link to="/club/events" className="link-arrow text-[11px]">All events</Link>} pad={false}>
             {upcoming.length === 0 ? <p className="p-6 text-center text-xs text-ink-soft">No published upcoming events yet.</p> : (
-              <ul className="divide-y divide-line">{upcoming.map((r) => <li key={r.id} className="flex items-center gap-3 px-5 py-3.5"><div className="min-w-0 flex-1 text-xs font-extrabold text-brand-900">{r.title}<div className="text-[10px] font-normal text-ink-mute">{fmtDate(r.date)} · {r.venue}</div></div><span className="pill bg-brand-800 text-white">Live</span></li>)}</ul>
+              <ul className="divide-y divide-line">{upcoming.map((r) => <li key={r.id} className="flex items-center gap-3 px-5 py-3.5"><div className="min-w-0 flex-1 text-xs font-extrabold text-brand-900">{r.title}<div className="text-[10px] font-normal text-ink-mute">{fmtDate(r.date)} · {r.venue || 'Hall to be announced'}</div></div><span className="pill bg-brand-800 text-white">Live</span></li>)}</ul>
             )}
           </Card>
         </div>

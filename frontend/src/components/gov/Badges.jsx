@@ -25,8 +25,8 @@ export const REQUEST_STATUS = {
   submitted: { label: 'Under review', tone: 'sky' },
   correction_requested: { label: 'Corrections requested', tone: 'amber' },
   rejected: { label: 'Rejected', tone: 'rose' },
-  approved: { label: 'Approved · not published', tone: 'green' },
-  published: { label: 'Published', tone: 'strong' },
+  approved: { label: 'Permission given', tone: 'green' },
+  published: { label: 'Circulated', tone: 'strong' },
   completed: { label: 'Completed', tone: 'gray' },
 };
 export const RequestStatus = ({ status }) => {

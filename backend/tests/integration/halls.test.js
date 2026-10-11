@@ -84,30 +84,31 @@ describe('hall recommendation', () => {
     expect(summary).toMatch(/Innovation Lab/);
   });
 
-  it('marks a hall that another request already holds, without telling a club whose event it is', async () => {
+  it('marks a hall that is already allocated to another event at that time', async () => {
     const club = await session('CLUB001');
-    const osa = await session('OSA001');
-    // REQ-1244 (Cultural club, submitted) holds University Amphitheatre on 2026-12-05 16:00 to 21:00
+    const events = await session('EVT001');
+    // REQ-1048 (Innovation Sprint, circulated) holds the Main Auditorium
+    const taken = (await events.get('/gov/state')).body.data.requests.find((r) => r.id === 'REQ-1048');
     const input = {
-      attendance: 500,
-      category: 'Cultural',
-      date: '2026-12-05',
-      startTime: '17:00',
-      endTime: '19:00',
+      attendance: 300,
+      category: 'Technical',
+      date: taken.date,
+      startTime: taken.startTime,
+      endTime: taken.endTime,
     };
-    const asClub = (await club.post('/ai/halls', input)).body.data;
-    const amph = asClub.rankings.find((h) => h.name === 'University Amphitheatre');
-    expect(amph.status).toBe('booked');
-    expect(amph.recommended).toBe(false);
-    expect(JSON.stringify(asClub)).not.toContain('Winter Cultural Fest');
-    expect(JSON.stringify(asClub)).toContain('Another club');
-    const asOsa = (await osa.post('/ai/halls', input)).body.data;
-    expect(JSON.stringify(asOsa)).toContain('Winter Cultural Fest'); // administrators see everything
+    for (const who of [club, events]) {
+      const res = (await who.post('/ai/halls', input)).body.data;
+      const aud = res.rankings.find((h) => h.name === 'Main Auditorium');
+      expect(aud.status).toBe('booked');
+      expect(aud.recommended).toBe(false);
+      expect(res.rankings.find((h) => h.recommended).name).not.toBe('Main Auditorium');
+    }
   });
 
-  it('is for club authorities and reviewers only, and validates the input', async () => {
+  it('is for club authorities and the Events Section only, and validates the input', async () => {
     const student = await session('STU2026001');
     expect((await student.post('/ai/halls', { attendance: 50 })).status).toBe(403);
+    expect((await (await session('OSA001')).post('/ai/halls', { attendance: 50 })).status).toBe(403);
     const club = await session('CLUB001');
     expect((await club.post('/ai/halls', { attendance: 0 })).status).toBe(400);
     expect((await club.post('/ai/halls', {})).status).toBe(400);
@@ -148,19 +149,39 @@ describe('hall recommendation', () => {
   });
 });
 
-describe('hall permission through the API', () => {
-  it('the Events Section approves or reassigns; a club or student cannot', async () => {
+describe('requesting and allocating a hall through the API', () => {
+  // an event that OSA has approved and the club has circulated, with one student registered
+  async function circulated(club, osa, student, over = {}) {
+    const id = (await club.act('saveRequest', goodRequest(over), { submit: true })).body.data.extra.id;
+    await osa.act('reviewRequest', id, { decision: 'clear' });
+    await osa.act('recordPhysical', id, { status: 'verified', receivedOn: '2026-10-10', refNo: 'OSA/HC/7' });
+    expect((await osa.act('finalApprove', id, {})).body.data.ok).toBe(true);
+    expect((await club.act('publishRequest', id)).body.data.ok).toBe(true);
+    await student.post('/gov/student/registrations', { eventId: `evt-${id.toLowerCase()}` });
+    return id;
+  }
+
+  it('the club asks with the registered count; the Events Section approves or assigns another hall', async () => {
     const club = await session('CLUB001');
+    const osa = await session('OSA001');
     const events = await session('EVT001');
     const student = await session('STU2026001');
-    const id = (await club.act('saveRequest', goodRequest(), { submit: true })).body.data.extra.id;
+    const id = await circulated(club, osa, student);
+
+    expect((await club.act('requestHall', id, { venue: 'Nowhere' })).body.data.ok).toBe(false);
+    const asked = await club.act('requestHall', id, {
+      venue: 'Seminar Room 3',
+      priority: 'medium',
+      registered: 500,
+    });
+    expect(asked.body.data.ok).toBe(true);
+    expect(asked.body.data.state.requests.find((r) => r.id === id).hall).toMatchObject({
+      status: 'requested',
+      registered: 1, // counted on the server
+    });
 
     expect((await club.act('reviewHall', id, { decision: 'approve' })).status).toBe(403);
     expect((await student.act('reviewHall', id, { decision: 'approve' })).status).toBe(403);
-
-    const view = (await club.get('/gov/state')).body.data.requests.find((r) => r.id === id);
-    expect(view.hall.status).toBe('pending');
-
     const moved = await events.act('reviewHall', id, {
       decision: 'reassign',
       venue: 'Innovation Lab',
@@ -174,25 +195,15 @@ describe('hall permission through the API', () => {
       requestedVenue: 'Seminar Room 3',
       note: 'Room is being repainted.',
     });
-
-    // a hall that holds fewer people than expected is refused
-    const crowd = (
-      await club.act(
-        'saveRequest',
-        goodRequest({ title: 'Big Crowd Night', capacity: 100, venue: 'Central Library Hall' }),
-        { submit: true },
-      )
-    ).body.data.extra.id;
-    const tooSmall = await events.act('reviewHall', crowd, { decision: 'reassign', venue: 'Innovation Lab' });
-    expect(tooSmall.body.data.ok).toBe(false);
-    expect(tooSmall.body.data.error).toMatch(/holds 60/);
   });
 
-  it('rejecting the hall sends the request back with the reason for the club to fix', async () => {
+  it('a rejected hall request carries the reason and the club can ask again', async () => {
     const club = await session('CLUB001');
+    const osa = await session('OSA001');
     const events = await session('EVT001');
-    const id = (await club.act('saveRequest', goodRequest({ title: 'Reject Hall Night' }), { submit: true }))
-      .body.data.extra.id;
+    const student = await session('STU2026001');
+    const id = await circulated(club, osa, student, { title: 'Reject Hall Night' });
+    await club.act('requestHall', id, { venue: 'Seminar Room 3' });
     expect((await events.act('reviewHall', id, { decision: 'reject', note: '' })).body.data.ok).toBe(false);
     const rejected = await events.act('reviewHall', id, {
       decision: 'reject',
@@ -200,14 +211,21 @@ describe('hall permission through the API', () => {
     });
     expect(rejected.body.data.ok).toBe(true);
     const r = (await club.get('/gov/state')).body.data.requests.find((x) => x.id === id);
-    expect(r.status).toBe('correction_requested');
-    expect(r.hall.status).toBe('rejected');
-    expect(r.feedback.at(-1).note).toBe('Closed for exams that week.');
-    const resub = await club.act(
-      'saveRequest',
-      goodRequest({ title: 'Reject Hall Night', venue: 'Innovation Lab' }),
-      { submit: true, id },
-    );
-    expect(resub.body.data.ok).toBe(true);
+    expect(r.status).toBe('published'); // still open for registration
+    expect(r.hall).toMatchObject({ status: 'rejected', note: 'Closed for exams that week.' });
+    expect((await club.act('requestHall', id, { venue: 'Innovation Lab' })).body.data.ok).toBe(true);
+  });
+
+  it('the seeded hall request is waiting for the Events Section, with its priority', async () => {
+    const events = await session('EVT001');
+    const r = (await events.get('/gov/state')).body.data.requests.find((x) => x.id === 'REQ-1210');
+    expect(r.hall).toMatchObject({
+      status: 'requested',
+      priority: 'high',
+      requestedVenue: 'North Lab · Room 204',
+    });
+    const done = await events.act('reviewHall', 'REQ-1210', { decision: 'approve' });
+    expect(done.body.data.ok).toBe(true);
+    expect(done.body.data.state.requests.find((x) => x.id === 'REQ-1210').venue).toBe('North Lab · Room 204');
   });
 });

@@ -121,17 +121,16 @@ export function clubMembers(state, clubId) {
 export const getRequest = (state, id) => state.requests.find((r) => r.id === id) || null;
 export const requestsForClub = (state, clubId) => state.requests.filter((r) => r.clubId === clubId);
 
-/** The hall permission of a request. Older records without one count as approved once reviewed. */
+/** The hall permission of a request. Older records without one count as approved once published. */
 export const hallOf = (r) =>
   r.hall ?? {
-    status:
-      r.onlineReview?.status === 'cleared' || ['approved', 'published', 'completed'].includes(r.status)
-        ? 'approved'
-        : 'pending',
+    status: ['published', 'completed'].includes(r.status) ? 'approved' : 'none',
     by: null,
     at: null,
     note: '',
-    requestedVenue: r.venue,
+    requestedVenue: r.venue || '',
+    priority: null,
+    registered: 0,
   };
 export const hallStatus = (r) => hallOf(r).status;
 
@@ -139,6 +138,8 @@ export const needsOnlineReview = (r) => r.status === 'submitted' && r.onlineRevi
 export const needsPhysical = (r) => r.status === 'submitted' && r.physical.status !== 'verified';
 export const readyForApproval = (r) =>
   r.status === 'submitted' && r.onlineReview.status === 'cleared' && r.physical.status === 'verified';
+/** A circulated event whose club has asked the Events Section for a hall. */
+export const awaitingHall = (r) => r.status === 'published' && hallOf(r).status === 'requested';
 export const readyToPublish = (r) => r.status === 'approved';
 
 const toMin = (t) => {
@@ -166,8 +167,9 @@ export function trackerSteps(r) {
     { key: 'submitted', label: 'Submitted', state: 'todo', detail: '' },
     { key: 'online', label: 'Online review', state: 'todo', detail: '' },
     { key: 'physical', label: 'Hard-copy check', state: 'todo', detail: '' },
-    { key: 'approval', label: 'OSA approval', state: 'todo', detail: '' },
-    { key: 'published', label: 'Published', state: 'todo', detail: '' },
+    { key: 'approval', label: 'OSA permission', state: 'todo', detail: '' },
+    { key: 'published', label: 'Circulated', state: 'todo', detail: '' },
+    { key: 'hall', label: 'Hall', state: 'todo', detail: '' },
   ];
   if (r.status === 'draft') return steps;
   steps[0].state = 'done';
@@ -204,13 +206,32 @@ export function trackerSteps(r) {
 
   if (['published', 'completed'].includes(r.status)) {
     steps[4].state = 'done';
-    steps[4].detail = 'Live for students';
+    steps[4].detail = 'Open for registration';
   } else if (r.status === 'approved') {
     steps[4].state = 'current';
-    steps[4].detail = 'Ready to publish';
+    steps[4].detail = 'Club can circulate';
+  } else {
+    steps[4].detail = r.status === 'rejected' ? '—' : 'After OSA permission';
   }
 
-  if (r.status === 'rejected') steps[3].state = steps[4].state = 'todo';
+  const hs = hallOf(r).status;
+  if (hs === 'approved') {
+    steps[5].state = 'done';
+    steps[5].detail = r.venue || 'Allocated';
+  } else if (hs === 'requested') {
+    steps[5].state = 'current';
+    steps[5].detail = 'With Events Section';
+  } else if (hs === 'rejected') {
+    steps[5].state = 'warn';
+    steps[5].detail = 'Request another hall';
+  } else if (r.status === 'published') {
+    steps[5].state = 'current';
+    steps[5].detail = 'Club to request';
+  } else {
+    steps[5].detail = r.status === 'rejected' ? '—' : 'After registrations';
+  }
+
+  if (r.status === 'rejected') steps[3].state = steps[4].state = steps[5].state = 'todo';
   return steps;
 }
 
@@ -243,7 +264,7 @@ export function toStudentEvent(r, state) {
     shortDate: fmtDay(r.date),
     time: fmt12(r.startTime),
     endTime: fmt12(r.endTime),
-    venue: r.venue,
+    venue: r.venue || 'Hall to be announced',
     venueNote: 'GENESIS University campus',
     blurb: r.description.length > 120 ? `${r.description.slice(0, 117)}…` : r.description,
     long: r.description,
@@ -305,7 +326,8 @@ export function adminStats(state) {
   const live = r.filter((x) => !['completed'].includes(x.status));
   return {
     pendingOnline: r.filter(needsOnlineReview).length,
-    awaitingHall: r.filter((x) => x.status === 'submitted' && hallStatus(x) !== 'approved').length,
+    awaitingHall: r.filter(awaitingHall).length,
+    hallRequests: r.filter(awaitingHall).length,
     awaitingPhysical: r.filter(needsPhysical).length,
     readyForApproval: r.filter(readyForApproval).length,
     readyToPublish: r.filter(readyToPublish).length,

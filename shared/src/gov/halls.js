@@ -86,7 +86,7 @@ export function rankHalls(
       score -= 200;
       status = 'booked';
       reasons.push(
-        `Already requested at an overlapping time (${clashes
+        `Already booked at an overlapping time (${clashes
           .map((c) => c.title)
           .slice(0, 2)
           .join(', ')})`,

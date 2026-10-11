@@ -17,11 +17,13 @@ import ClubsDirectory from './pages/student/ClubsDirectory';
 import FavoriteClubs from './pages/student/FavoriteClubs';
 import Notifications from './pages/student/Notifications';
 import CampusAssistant from './pages/student/CampusAssistant';
+import StartClub from './pages/student/StartClub';
 import Profile from './pages/student/Profile';
 import Settings from './pages/student/Settings';
 
 import AdminLayout from './pages/admin/AdminLayout';
 import Overview from './pages/admin/Overview';
+import { EventsOverview, HallRequestsList, HallRequestDetail } from './pages/admin/HallRequests';
 import EventRequests from './pages/admin/EventRequests';
 import AdminRequestDetail from './pages/admin/RequestDetail';
 import PhysicalQueue from './pages/admin/PhysicalQueue';
@@ -84,6 +86,7 @@ export default function App() {
         <Route path="favorites" element={<FavoriteClubs />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="assistant" element={<CampusAssistant />} />
+        <Route path="start-club" element={<StartClub />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
@@ -101,18 +104,28 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Overview />} />
-          <Route path="requests" element={<EventRequests />} />
-          <Route path="requests/:id" element={<AdminRequestDetail />} />
-          <Route path="physical" element={<PhysicalQueue />} />
-          <Route path="promotions" element={<Promotions />} />
-          <Route path="club-applications" element={<ClubApplicationsList />} />
-          <Route path="club-applications/:id" element={<ClubApplicationDetail />} />
+          {type === 'osa' ? (
+            <>
+              <Route path="dashboard" element={<Overview />} />
+              <Route path="requests" element={<EventRequests />} />
+              <Route path="requests/:id" element={<AdminRequestDetail />} />
+              <Route path="physical" element={<PhysicalQueue />} />
+              <Route path="promotions" element={<Promotions />} />
+              <Route path="club-applications" element={<ClubApplicationsList />} />
+              <Route path="club-applications/:id" element={<ClubApplicationDetail />} />
+            </>
+          ) : (
+            <>
+              <Route path="dashboard" element={<EventsOverview />} />
+              <Route path="halls" element={<HallRequestsList />} />
+              <Route path="halls/:id" element={<HallRequestDetail />} />
+            </>
+          )}
           <Route path="clubs" element={<ClubDirectory />} />
           <Route path="clubs/:id" element={<ClubDetail />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<PortalSettings />} />
-          <Route path="*" element={<Navigate to="dashboard" replace />} />
+          <Route path="*" element={<Navigate to={`/admin/${type}/dashboard`} replace />} />
         </Route>
       ))}
 

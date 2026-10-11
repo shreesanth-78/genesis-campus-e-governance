@@ -18,15 +18,16 @@ export const ROLE_LABELS = {
 };
 
 const RULES = {
-  'request.review': ['events', 'osa'], // online review of documents/details
-  'request.physical': ['events', 'osa'], // record hard-copy letter verification
-  'request.hall': ['events', 'osa'], // give permission for the hall the club asked for (or assign another)
+  'request.review': ['osa'], // online review of documents/details: OSA
+  'request.physical': ['osa'], // record hard-copy letter verification: OSA
+  'request.hall': ['events'], // the Events Section allocates the hall a club asks for
   'request.approve': ['osa'], // FINAL approval: OSA only
-  'request.publish': ['events', 'osa'],
-  'promotion.review': ['events', 'osa'],
-  'clubApp.view': ['events', 'osa'],
-  'clubApp.aiCheck': ['events', 'osa'],
-  'clubApp.create': ['events', 'osa'],
+  'request.publish': ['osa'], // clubs circulate their own approved events (checked by ownership in the workflow)
+  'promotion.review': ['osa'],
+  'clubApp.apply': ['student'], // a student proposes a new club
+  'clubApp.view': ['osa'],
+  'clubApp.aiCheck': ['osa'],
+  'clubApp.create': ['osa'], // log a paper application
   'clubApp.decide': ['osa'],
   'reports.view': ['events', 'osa'],
 };

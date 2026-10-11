@@ -8,7 +8,6 @@ import { useGov } from '../../context/GovContext';
 import { REQUEST_CATEGORIES } from '../../data/govData';
 import { findConflicts, fmtDate, getClubFrom, needsOnlineReview, needsPhysical, readyForApproval, readyToPublish } from '../../store/selectors';
 import { useAdminBase } from './AdminLayout';
-import { useAuth } from '../../context/AuthContext';
 
 const TAB_FILTERS = {
   all: () => true,
@@ -23,7 +22,6 @@ const TAB_FILTERS = {
 
 export default function EventRequests() {
   const base = useAdminBase();
-  const { user } = useAuth();
   const { state } = useGov();
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') || 'all';
@@ -40,8 +38,8 @@ export default function EventRequests() {
 
   const filters = { ...TAB_FILTERS, conflicts: (r) => conflictIds.has(r.id) };
   const tabs = [
-    ['all', 'All'], ['review', 'Online review'], ['physical', 'Hard-copy'], ['approval', user.adminType === 'osa' ? 'Ready to approve' : 'Awaiting OSA'],
-    ['publish', 'Ready to publish'], ['published', 'Published'], ['returned', 'Returned'], ['completed', 'Past'], ['conflicts', 'Conflicts'],
+    ['all', 'All'], ['review', 'Online review'], ['physical', 'Hard-copy'], ['approval', 'Ready for permission'],
+    ['publish', 'Permission given'], ['published', 'Circulated'], ['returned', 'Returned'], ['completed', 'Past'], ['conflicts', 'Conflicts'],
   ].map(([key, label]) => ({ key, label, count: submitted.filter(filters[key]).length }));
 
   const list = useMemo(() => {
@@ -57,7 +55,7 @@ export default function EventRequests() {
 
   return (
     <div>
-      <PageHeader eyebrow="Review" title="Event requests" subtitle="Online review, hard-copy verification, approval and publishing are separate steps." />
+      <PageHeader eyebrow="Review" title="Event requests" subtitle="Online review and hard-copy verification, then OSA gives permission. The club circulates the event and later asks for a hall." />
       <div className="mb-4"><Tabs tabs={tabs} value={tab} onChange={(v) => set('tab', v)} /></div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SearchBox value={q} onChange={(v) => set('q', v)} placeholder="Search by event, club or request ID" />

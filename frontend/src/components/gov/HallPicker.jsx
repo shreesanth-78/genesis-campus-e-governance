@@ -11,7 +11,7 @@ export const FIT = {
   tight: { label: 'Almost full', cls: 'bg-amber-soft text-amber-ink', bar: 'bg-[#e3a02c]' },
   oversized: { label: 'Much larger than needed', cls: 'bg-amber-soft text-amber-ink', bar: 'bg-[#e3a02c]' },
   too_small: { label: 'Too small', cls: 'bg-rose-soft text-rose-ink', bar: 'bg-[#e06052]' },
-  booked: { label: 'Already requested', cls: 'bg-rose-soft text-rose-ink', bar: 'bg-[#e06052]' },
+  booked: { label: 'Already booked', cls: 'bg-rose-soft text-rose-ink', bar: 'bg-[#e06052]' },
   unknown: { label: '', cls: '', bar: 'bg-brand-200' },
 };
 

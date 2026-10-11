@@ -5,7 +5,7 @@ import { RequestStatus } from '../../components/gov/Badges';
 import { Icon, PageHeader } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useGov } from '../../context/GovContext';
-import { adminStats, fmtDate, fmtDateTime, getClubFrom, needsOnlineReview, needsPhysical, readyForApproval, readyToPublish } from '../../store/selectors';
+import { adminStats, fmtDate, fmtDateTime, getClubFrom, needsOnlineReview, needsPhysical, readyForApproval } from '../../store/selectors';
 import { useAdminBase } from './AdminLayout';
 import { firstName } from '../../utils/helpers';
 
@@ -16,7 +16,6 @@ export default function Overview() {
   const base = useAdminBase();
   const nav = useNavigate();
   const { state } = useGov();
-  const isOsa = user.adminType === 'osa';
   const s = useMemo(() => adminStats(state), [state]);
 
   // Actionable queue for this role
@@ -24,30 +23,29 @@ export default function Overview() {
     const rows = [];
     state.requests.forEach((r) => {
       if (needsOnlineReview(r)) rows.push({ r, action: 'Online review needed', tone: 'sky' });
-      else if (readyForApproval(r)) rows.push({ r, action: isOsa ? 'Ready for final approval' : 'Awaiting OSA approval', tone: isOsa ? 'green' : 'gray' });
-      else if (readyToPublish(r)) rows.push({ r, action: 'Approved · ready to publish', tone: 'green' });
+      else if (readyForApproval(r)) rows.push({ r, action: 'Ready to give permission', tone: 'green' });
       else if (needsPhysical(r) && r.onlineReview.status === 'cleared') rows.push({ r, action: 'Hard-copy letter not verified', tone: 'amber' });
     });
     return rows.slice(0, 7);
-  }, [state, isOsa]);
+  }, [state]);
 
   const stats = [
     { label: 'Awaiting online review', value: s.pendingOnline, icon: 'Eye', tone: 'sky', to: `${base}/requests?tab=review` },
     { label: 'Hard-copy checks pending', value: s.awaitingPhysical, icon: 'FileCheck2', tone: 'amber', to: `${base}/physical` },
-    { label: isOsa ? 'Ready for your approval' : 'Awaiting OSA approval', value: s.readyForApproval, icon: 'Stamp', tone: 'green', to: `${base}/requests?tab=approval` },
-    { label: 'Approved · to publish', value: s.readyToPublish, icon: 'Send', tone: 'green', to: `${base}/requests?tab=publish` },
+    { label: 'Ready for your permission', value: s.readyForApproval, icon: 'Stamp', tone: 'green', to: `${base}/requests?tab=approval` },
+    { label: 'Permission given · club to circulate', value: s.readyToPublish, icon: 'Send', tone: 'green', to: `${base}/requests?tab=publish` },
     { label: 'Promotion requests', value: s.pendingPromotions, icon: 'Megaphone', tone: 'plum', to: `${base}/promotions` },
     { label: 'Club applications', value: s.clubApps, icon: 'UserPlus', tone: 'plum', to: `${base}/club-applications` },
     { label: 'Venue conflicts', value: s.conflicts, icon: 'AlertTriangle', tone: s.conflicts ? 'rose' : 'green', to: `${base}/requests?tab=conflicts` },
-    { label: 'Events live for students', value: s.published, icon: 'PartyPopper', tone: 'green', to: `${base}/requests?tab=published` },
+    { label: 'Events circulated to students', value: s.published, icon: 'PartyPopper', tone: 'green', to: `${base}/requests?tab=published` },
   ];
 
   return (
     <div>
       <PageHeader
-        eyebrow={isOsa ? 'Office of Student Affairs' : 'Events Section'}
+        eyebrow="Office of Student Affairs"
         title={`Welcome back, ${firstName(user.name)}`}
-        subtitle={isOsa ? 'Review requests, grant final approvals and decide club applications.' : 'Review requests, verify hard copies and publish approved events. Final approval is reserved for OSA.'}
+        subtitle="Review event requests, give permission to circulate them and decide new-club applications."
         action={<Link to={`${base}/requests`} className="btn-primary"><Icon name="ClipboardList" className="h-4 w-4" /> Open request queue</Link>}
       />
 

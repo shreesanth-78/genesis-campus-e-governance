@@ -58,40 +58,41 @@ describe('role portals', () => {
 });
 
 describe('approval UI end to end', () => {
-  it('Events Section cannot grant final approval (button absent, reason shown)', async () => {
-    mount('EVT001', '/admin/events/requests/REQ-1248');
-    expect((await screen.findAllByText('Alumni Dev Talks')).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: /Grant final approval/ })).toBeNull();
-    expect(screen.getByText(/only be granted by authorized OSA staff/i)).toBeTruthy();
+  it('the Events Section has no review pages: it only sees hall requests', async () => {
+    mount('EVT001', '/admin/events/requests/REQ-1248'); // an OSA page: redirected to the overview
+    expect(await screen.findByText(/Welcome back, Rohan/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Event Requests/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Club Applications/ })).toBeNull();
+    expect(screen.getAllByRole('link', { name: /Hall Requests/ }).length).toBeGreaterThan(0);
   });
 
-  it('OSA approves, Events publishes, student sees the event and notification', async () => {
+  it('OSA gives permission, the club circulates the event, and the student sees it with a notification', async () => {
     const user = userEvent.setup();
     mount('OSA001', '/admin/osa/requests/REQ-1248');
-    await user.click(await screen.findByRole('button', { name: /Grant final approval/ }));
-    await user.click(await screen.findByRole('button', { name: /Approve event/ }));
-    await waitFor(() => expect(screen.getAllByText(/Approved · not published/).length).toBeGreaterThan(0));
+    await user.click(await screen.findByRole('button', { name: /Give permission/ }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Give permission/ }));
+    await waitFor(() => expect(screen.getAllByText(/Permission given/).length).toBeGreaterThan(0));
 
-    // Unpublished: student does not see it
+    // seeded REQ-1255 already has permission: its club circulates it
     mount('STU2026001', '/student/events');
     await screen.findAllByText(/Explore/i);
-    expect(screen.queryByText('Alumni Dev Talks')).toBeNull();
+    expect(screen.queryByText('Robotics Arena Showdown')).toBeNull();
 
-    mount('EVT001', '/admin/events/requests/REQ-1248');
-    await user.click(await screen.findByRole('button', { name: /Publish & notify students/ }));
-    await user.click(await screen.findByRole('button', { name: 'Publish' }));
-    await waitFor(() => expect(screen.getAllByText('Published').length).toBeGreaterThan(0));
+    mount('CLUB002', '/club/requests/REQ-1255');
+    await user.click(await screen.findByRole('button', { name: /Circulate to students/ }));
+    await user.click(await screen.findByRole('button', { name: 'Circulate' }));
+    await waitFor(() => expect(screen.getAllByText('Circulated').length).toBeGreaterThan(0));
 
     mount('STU2026001', '/student/events');
-    expect((await screen.findAllByText('Alumni Dev Talks')).length).toBeGreaterThan(0);
-
+    expect((await screen.findAllByText('Robotics Arena Showdown')).length).toBeGreaterThan(0);
     mount('STU2026001', '/student/notifications');
-    expect((await screen.findAllByText(/Alumni Dev Talks just dropped/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/Robotics Arena Showdown just dropped/)).length).toBeGreaterThan(0);
   });
 
-  it('request corrections requires reason text and shows to club', async () => {
+  it('OSA request corrections requires reason text and shows to club', async () => {
     const user = userEvent.setup();
-    mount('EVT001', '/admin/events/requests/REQ-1251');
+    mount('OSA001', '/admin/osa/requests/REQ-1251');
     await user.click(await screen.findByRole('button', { name: 'Request corrections' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Send corrections' }));
@@ -107,7 +108,7 @@ describe('approval UI end to end', () => {
 });
 
 describe('club submits a new request', () => {
-  it('validates, submits with files, and the admin queue shows it', async () => {
+  it('validates, submits with files (no hall yet), and OSA sees it', async () => {
     const user = userEvent.setup();
     mount('CLUB001', '/club/requests/new');
     await user.click(await screen.findByRole('button', { name: /Submit for review/ }));
@@ -122,7 +123,7 @@ describe('club submits a new request', () => {
     await setVal(/Starts/, '17:00');
     await setVal(/Ends/, '20:00');
     await setVal(/Expected attendance/, '40');
-    await user.click(screen.getByRole('radio', { name: /Seminar Room 3/ }));
+    expect(screen.queryByRole('radio')).toBeNull(); // the hall is requested later, after registrations
     await setVal(/Registration closes/, '2026-10-25');
     const png = new File([new Uint8Array(2000)], 'poster.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Event poster'), png);
@@ -135,7 +136,7 @@ describe('club submits a new request', () => {
     expect(await screen.findByRole('heading', { name: 'Prototype Showcase Night' })).toBeTruthy();
     expect(screen.getAllByText('Under review').length).toBeGreaterThan(0);
 
-    mount('EVT001', '/admin/events/requests');
+    mount('OSA001', '/admin/osa/requests');
     expect(await screen.findByText('Prototype Showcase Night')).toBeTruthy();
     mount('STU2026001', '/student/events');
     await screen.findAllByText(/Explore/i);
@@ -143,45 +144,52 @@ describe('club submits a new request', () => {
   });
 });
 
-describe('hall selection and permission', () => {
-  it('sorts the halls for the expected crowd, recommends one, and lets the club pick it', async () => {
+describe('asking for a hall and allocating it', () => {
+  it('the club sees the registrations, sorts the halls for the crowd, picks a priority and asks', async () => {
     const user = userEvent.setup();
-    mount('CLUB001', '/club/requests/new');
-    const attendance = await screen.findByLabelText(/Expected attendance/);
-    await user.type(attendance, '50');
+    mount('CLUB002', '/club/requests/REQ-1255');
+    await user.click(await screen.findByRole('button', { name: /Circulate to students/ }));
+    await user.click(await screen.findByRole('button', { name: 'Circulate' }));
+    expect(await screen.findByText(/students registered so far/)).toBeTruthy();
     const radios = screen.getAllByRole('radio');
-    expect(radios[0].getAttribute('aria-label')).toMatch(/Innovation Lab/); // the best fit for 50 people comes first
-    expect(screen.getByText('Too small')).toBeTruthy(); // Seminar Room 3 holds 45
+    expect(radios.length).toBe(8);
     await user.click(screen.getByRole('button', { name: /Recommend a hall/ }));
-    expect(await screen.findByText(/Innovation Lab is the best fit/)).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: /Use Innovation Lab/ }));
-    expect(screen.getByRole('radio', { name: /Innovation Lab/ }).getAttribute('aria-checked')).toBe('true');
+    expect(await screen.findByText(/best fit/i)).toBeTruthy();
+    await user.click(radios[0]);
+    await user.selectOptions(screen.getByLabelText(/Priority for your club/), 'high');
+    await user.click(screen.getByRole('button', { name: /Request this hall/ }));
+    expect(await screen.findByText(/Waiting for the Events Section/)).toBeTruthy();
   });
 
-  it('the Events Section approves the hall before it can clear the online review; a club sees the decision', async () => {
+  it('the Events Section sees the request with its priority and allocates the hall; the club sees the decision', async () => {
     const user = userEvent.setup();
-    mount('EVT001', '/admin/events/requests/REQ-1251');
-    const clear = await screen.findByRole('button', { name: /Clear online review/ });
-    expect(clear.disabled).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Approve hall' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Clear online review/ }).disabled).toBe(false));
-
-    mount('CLUB001', '/club/requests/REQ-1251');
-    expect((await screen.findAllByText('Hall approved')).length).toBeGreaterThan(0);
+    mount('EVT001', '/admin/events/halls');
+    expect(await screen.findByText('Data Science After Hours')).toBeTruthy();
+    await user.click(screen.getAllByRole('link', { name: 'Open' })[0]);
+    expect((await screen.findAllByText(/High priority/)).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Allocate this hall' }));
+    await waitFor(() => expect(screen.getAllByText('Hall allocated').length).toBeGreaterThan(0));
   });
 
-  it('a reassigned hall is shown to the club, and a hall that cannot be used sends the request back', async () => {
+  it('a different hall can be assigned, and a reason is needed to refuse', async () => {
     const user = userEvent.setup();
-    mount('EVT001', '/admin/events/requests/REQ-1251');
+    mount('EVT001', '/admin/events/halls/REQ-1210');
     await user.click(await screen.findByRole('button', { name: 'Assign a different hall' }));
-    await user.selectOptions(await screen.findByLabelText(/New hall/), 'Main Auditorium (holds 600, much larger than needed)');
+    await user.selectOptions(await screen.findByLabelText(/New hall/), 'Innovation Lab');
     await user.click(screen.getByRole('button', { name: 'Assign hall' }));
-    mount('CLUB001', '/club/requests/REQ-1251');
-    expect(await screen.findByText(/assigned/)).toBeTruthy();
-    expect(screen.getAllByText(/Main Auditorium/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('Hall allocated').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Innovation Lab').length).toBeGreaterThan(0);
+  });
 
-    mount('EVT001', '/admin/events/requests/REQ-1262');
-    expect((await screen.findAllByText(/Pitch Practice Night/)).length).toBeGreaterThan(0);
+  it('refusing a hall needs a reason', async () => {
+    const user = userEvent.setup();
+    mount('EVT001', '/admin/events/halls/REQ-1210');
+    await user.click(await screen.findByRole('button', { name: /Hall can’t be given/ }));
+    const send = screen.getByRole('button', { name: 'Send back to the club' });
+    expect(send.disabled).toBe(true);
+    await user.type(screen.getByLabelText(/Why can’t this hall be given/), 'Closed for exams.');
+    await user.click(send);
+    await waitFor(() => expect(screen.getAllByText('Hall not given').length).toBeGreaterThan(0));
   });
 });
 
@@ -198,11 +206,11 @@ describe('club authority edits own club', () => {
   });
 });
 
-describe('club applications (OSA only decisions)', () => {
-  it('Events Section sees a lock; OSA runs the AI check then approves', async () => {
+describe('club applications', () => {
+  it('OSA runs the AI check then approves; the Events Section has no access', async () => {
     const user = userEvent.setup();
-    mount('EVT001', '/admin/events/club-applications/CA-502');
-    expect(await screen.findByText(/Only OSA can approve or reject club applications/)).toBeTruthy();
+    mount('EVT001', '/admin/events/club-applications/CA-502'); // redirected away
+    expect(await screen.findByText(/Welcome back, Rohan/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Approve club/ })).toBeNull();
 
     mount('OSA001', '/admin/osa/club-applications/CA-502');
@@ -213,15 +221,44 @@ describe('club applications (OSA only decisions)', () => {
     mount('STU2026001', '/student/clubs');
     expect((await screen.findAllByText('Chess Society')).length).toBeGreaterThan(0);
   });
+
+  it('a student is stopped when a similar club exists, and a new idea goes to OSA', async () => {
+    const user = userEvent.setup();
+    mount('STU2026001', '/student/start-club');
+    await user.type(await screen.findByLabelText(/Proposed club name/), 'Programmers Guild');
+    await user.selectOptions(screen.getByLabelText(/^Category/), 'Technical & Engineering');
+    await user.type(screen.getByLabelText(/What will the club do/), 'A group where students learn programming, build software and take part in coding contests.');
+    await user.click(screen.getByRole('button', { name: /Check my idea/ }));
+    expect(await screen.findByText('A similar club already exists.')).toBeTruthy();
+
+    // a distinct idea passes the check and is sent to OSA
+    const name = screen.getByLabelText(/Proposed club name/);
+    await user.clear(name);
+    await user.type(name, 'Bee Keepers Society');
+    await user.selectOptions(screen.getByLabelText(/^Category/), 'Media, Lit & Social Responsibility');
+    const what = screen.getByLabelText(/What will the club do/);
+    await user.clear(what);
+    await user.type(what, 'Students look after beehives on campus, learn about pollination and sell the honey they harvest.');
+    await user.click(screen.getByRole('button', { name: /Check my idea/ }));
+    expect(await screen.findByText('Looks like a new idea.')).toBeTruthy();
+    await user.type(screen.getByRole('textbox', { name: /Faculty advisor/ }), 'Dr. Lakshmi Pillai');
+    await user.type(screen.getByRole('spinbutton', { name: /Founding members/ }), '14');
+    await user.click(screen.getByRole('button', { name: /Apply to start this club/ }));
+    expect((await screen.findAllByText('Bee Keepers Society')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Awaiting decision').length).toBeGreaterThan(0);
+
+    mount('OSA001', '/admin/osa/club-applications');
+    expect(await screen.findByText('Bee Keepers Society')).toBeTruthy();
+  });
 });
 
 describe('route sweep (no crashes / console errors)', () => {
   const sweep = {
     OSA001: ['dashboard', 'requests', 'requests/REQ-1244', 'requests/REQ-1255', 'requests/REQ-1048', 'requests/REQ-0987', 'physical', 'promotions', 'club-applications', 'club-applications/CA-501', 'club-applications/CA-504', 'clubs', 'clubs/innovation', 'clubs/robotics', 'reports', 'settings'].map((p) => `/admin/osa/${p}`),
-    EVT001: ['dashboard', 'requests?tab=review', 'requests/REQ-1239', 'physical', 'promotions', 'club-applications', 'clubs/green', 'reports', 'settings'].map((p) => `/admin/events/${p}`),
-    CLUB001: ['dashboard', 'profile', 'members', 'requests', 'requests/new', 'requests/REQ-1262', 'requests/REQ-1262/edit', 'requests/REQ-1048', 'promotions', 'events', 'settings'].map((p) => `/club/${p}`),
+    EVT001: ['dashboard', 'halls', 'halls?tab=approved', 'halls/REQ-1210', 'halls/REQ-1048', 'clubs/green', 'reports', 'settings'].map((p) => `/admin/events/${p}`),
+    CLUB001: ['dashboard', 'profile', 'members', 'requests', 'requests/new', 'requests/REQ-1262', 'requests/REQ-1262/edit', 'requests/REQ-1048', 'requests/REQ-1251', 'promotions', 'events', 'settings'].map((p) => `/club/${p}`),
     CLUB002: ['dashboard', 'requests/REQ-1255', 'promotions', 'events'].map((p) => `/club/${p}`),
-    STU2026001: ['dashboard', 'events', 'calendar', 'registrations', 'clubs', 'favorites', 'notifications', 'assistant', 'profile', 'settings'].map((p) => `/student/${p}`),
+    STU2026001: ['dashboard', 'events', 'calendar', 'registrations', 'clubs', 'start-club', 'favorites', 'notifications', 'assistant', 'profile', 'settings'].map((p) => `/student/${p}`),
   };
   for (const [uid, paths] of Object.entries(sweep)) {
     it(`${uid} renders ${paths.length} routes`, async () => {

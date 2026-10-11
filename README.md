@@ -8,7 +8,7 @@
 
 **Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
 
-> One campus. One place for every request. Clubs submit event requests, the Events Section and the Office of Student Affairs (OSA) review and approve them in a tracked, role-enforced workflow, and students discover, register for and get notified about approved events, with an AI assistant that knows every club.
+> One campus. One place for every request. Clubs ask the Office of Student Affairs (OSA) for permission, circulate the approved event to collect registrations, and then ask the Events Section for a hall sized to the real crowd, all in a tracked, role-enforced workflow. Students discover, register for and get notified about events, and can propose new clubs, with an AI assistant that knows every club.
 
 [Problem](#1-the-problem) · [Solution](#2-our-solution) · [Live demo](#3-try-it-live-and-a-five-minute-guided-demo) · [Features](#4-what-we-built) · [AI](#5-ai-in-the-product) · [Architecture](#6-architecture) · [Security](#7-security-and-trust) · [Tech stack](#8-tech-stack) · [Quality](#9-quality-and-testing) · [Run it](#10-run-it-locally) · [Deploy](#11-deployment) · [Team](#13-team)
 
@@ -20,7 +20,8 @@ University life runs on informal channels, and that costs everyone time:
 
 - **Students** do not know which clubs exist, what each one actually does, or when events happen. Announcements are scattered across WhatsApp groups and posters, so good events are missed and seats go unfilled.
 - **Clubs** send event requests on paper and in chat messages. They cannot see where a request is stuck, and corrections come back late and unclear.
-- **Administrators** (Events Section and OSA) review requests with no shared tracker, so documents, hard-copy letters, venue clashes and final approval are chased by hand. Nothing guarantees an event is approved _before_ it is advertised.
+- **Administrators** (OSA and the Events Section) work with no shared tracker, so documents, hard-copy letters, hall clashes and permissions are chased by hand. Halls are guessed from expected numbers rather than real registrations, and nothing guarantees an event is approved _before_ it is advertised.
+- **Students with a new idea** have no clear way to start a club, and duplicates of existing clubs reach the office by paper.
 - **Nobody** has one trustworthy record of what was requested, who approved it and when.
 
 ## 2. Our solution
@@ -29,25 +30,27 @@ GENESIS Campus Connect is one web portal with three entry points (**Student**, *
 
 ```mermaid
 flowchart LR
-    A[Club submits request<br/>poster, documents, hall<br/>chosen with AI help] --> H[Events Section<br/>hall permission]
-    H --> B[Events Section<br/>online review]
-    B --> C[Events Section<br/>hard-copy letter check]
-    C --> D[OSA<br/>final approval]
-    D --> E[Events Section or OSA<br/>publish]
-    E --> F[Students see the event,<br/>get a catchy notification,<br/>register for a seat]
-    H -. hall not approved .-> A
+    A[Club asks OSA<br/>poster, documents] --> B[OSA<br/>online review and<br/>hard-copy letter check]
+    B --> D[OSA gives permission<br/>to circulate]
+    D --> E[Club circulates the event<br/>on the portal]
+    E --> F[Students see it, get a catchy<br/>notification and register]
+    F --> G[Club picks its priority events<br/>and asks for a hall using the<br/>real registration count, with AI help]
+    G --> H[Events Section<br/>allocates the hall]
     B -. corrections .-> A
     D -. reject with reason .-> A
+    H -. hall not given, ask again .-> G
 ```
+
+A student with a new club idea follows a second path: **idea check** (the portal compares it with every club and pending application by meaning, and stops it if the same focus area is covered) → **OSA** checks the documents and decides → the club appears in the directory.
 
 What changes for each person:
 
-| Who                | Before                             | With GENESIS Campus Connect                                                                                                        |
-| ------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Student**        | Hunts through chats and posters    | One dashboard of approved events, a club directory of 26 Amrita clubs, one-click seat registration, notifications, an AI assistant |
-| **Club Authority** | Paper letters, no visibility       | A guided request form, a five-step tracker, written feedback, resubmission with versioning                                         |
-| **Events Section** | Chases documents and letters       | A review queue, a separate hard-copy verification step, venue-clash flags, publish and notify                                      |
-| **OSA**            | Approves without a clear checklist | Final approval unlocked only when review and hard-copy check are done; decides new-club applications                               |
+| Who                | Before                             | With GENESIS Campus Connect                                                                                                                 |
+| ------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Student**        | Hunts through chats and posters    | One dashboard of events, a club directory of 26 Amrita clubs, one-click seat registration, notifications, an AI assistant, **Start a club** |
+| **Club Authority** | Paper letters, no visibility       | A guided request form, a tracker, written feedback, **circulate the approved event, then request a hall with a priority**                   |
+| **OSA**            | Approves without a clear checklist | Review and hard-copy check, permission unlocked only when both are done; **decides new-club applications**                                  |
+| **Events Section** | Guesses halls, chases clubs        | **A queue of hall requests with the registered count and the club's priority**, AI-ranked halls, allocate, reassign or refuse with a reason |
 
 Design principles: **the server is the authority** (the browser only hides buttons), **nothing reaches students until it is approved**, and **every step leaves a visible, timestamped record**.
 
@@ -88,13 +91,13 @@ The portal is deployed as **one service on Render**: the same address serves the
 
 Follow one event from request to registration. Use two windows (one normal, one private) so you can switch roles quickly.
 
-1. **Club Authority** → _Event Requests → New request_. Fill the form, attach a poster and the three required documents, press **Submit for review**. Watch the five-step tracker.
-2. **Events Section** → open the request → **Clear online review**, then **Record hard-copy check** (give a reference number). Note that **Grant final approval is locked** with an explanation; the server refuses it too.
-3. **OSA** → open the same request → **Grant final approval**. (On another request try _Request corrections_ or _Reject_ to see the feedback loop; the club can correct and resubmit.)
-4. **Events Section** → **Publish & notify students**. Only now does the event exist for students.
-5. **Student** → the event is on the dashboard with a notification such as _"Midnight Maker Sprint just dropped"_ carrying a hook line. Open it and **Register**; the seat count updates for everyone.
+1. **Club Authority** → _Event Requests → New request_. Fill the form (there is no hall yet), attach a poster and the three required documents, press **Submit for review**. Watch the tracker.
+2. **OSA** → open the request → **Clear online review**, then **Record hard-copy check** (give a reference number), then **Give permission**. (On another request try _Request corrections_ or _Reject_ to see the feedback loop; the club can correct and resubmit.) The **Events Section has no access to this step**; the server refuses it too.
+3. **Club Authority** → open the request → **Circulate to students**. Only now does the event exist for students.
+4. **Student** → register for the event (see the next step), then **Club Authority** → open the request: it shows **how many students registered**, the halls sorted for that number, and **Recommend a hall** (AI). Pick a hall and a **priority** (high, medium or low) and press **Request this hall**.
+5. **Student** → the event is on the dashboard with a notification such as _"Midnight Maker Sprint just dropped"_ carrying a hook line. Open it and **Register**; the seat count updates for everyone. Then **Events Section** → _Hall Requests_ (highest priority first) → **Allocate this hall**, assign a different one, or refuse with a reason; the club and the students see the result.
 6. **Student → Campus AI Assistant**: ask _"I like music, which clubs suit me?"_, _"What is GDSC for?"_ and _"What are the current events?"_. Then try _"solve 12\*13+7"_ and see that it refuses: it only talks about clubs, events and the portal.
-7. **Administrator** → _Club Applications_ → run the **AI duplicate-club check** and approve a new club; it appears in the students' club directory at once.
+7. **Student → Start a club**: describe _"a group that learns programming and takes part in coding contests"_ and press **Check my idea**: it is stopped because a coding club exists. Try a new idea (_"beekeeping on campus"_) and apply. **OSA** → _Club Applications_ → open it → approve; the club appears in the directory.
 8. **Sign out** from the sidebar (every role has it).
 
 Prefer to run it yourself? See [section 10](#10-run-it-locally).
@@ -103,19 +106,19 @@ Prefer to run it yourself? See [section 10](#10-run-it-locally).
 
 ### Student portal
 
-Dashboard with countdowns · explore and search events with live seat counts · event details · **one-click registration checked by the server** (a full or closed event cannot be booked; two students racing for the last seat cannot both get it) · calendar · registrations and history · clubs directory with favourites · notifications · **Campus AI Assistant** · profile and settings.
+Dashboard with countdowns · **Start a club** (idea check against every club and pending application, then apply and follow the status) · explore and search events with live seat counts · event details · **one-click registration checked by the server** (a full or closed event cannot be booked; two students racing for the last seat cannot both get it) · calendar · registrations and history · clubs directory with favourites · notifications · **Campus AI Assistant** · profile and settings.
 
 ### Club Authority portal
 
-Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning, **a hall picker that sorts every hall by how well it fits the number of people you expect (with an AI recommendation)**, venue-clash and capacity warnings · five-step tracker, feedback and **version history on resubmission** · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
-
-### Events Section
-
-Review queue with filters · **hall permission** (approve the hall the club asked for, assign a different one that fits and is free, or send the request back with a reason) · online review (clear, request corrections, reject with a mandatory reason) · **separate hard-copy letter verification** with date and reference number · publish and notify students · promotion review · club applications (view and AI check) · club directory · reports and audit trail.
+Overview · club profile (own club only) · members · event requests with poster and documents, 2-day notice rule, 9 PM timing warning · tracker, feedback and **version history on resubmission** · **circulate an approved event** and watch the registrations · **request a hall for the registered crowd**, with halls sorted by fit, an AI recommendation and a priority · promotion requests (dashboard, poster boards, signage, newsletter) · our events.
 
 ### OSA
 
-Everything the Events Section does, plus **final approval** (the only role that can) and **approve / reject / ask corrections on club applications**, which needs the three documents, at least 10 founding members, the duplicate check and a confirmation when a very similar club exists.
+Review queue with filters · online review (clear, request corrections, reject with a mandatory reason) · **separate hard-copy letter verification** with date and reference number · **permission to circulate** (unlocked only when both checks are done) · promotion review · **new-club applications**: the AI duplicate check, the three documents, at least 10 founding members, then approve, ask corrections or reject · club directory · reports and audit trail.
+
+### Events Section
+
+**Hall requests only.** A queue of events that clubs have circulated and asked a hall for, highest priority first, each with the **registered count**, the hall asked for and its fit · **allocate the hall**, **assign a different one** (only halls that hold the crowd and are free are offered), or **refuse with a reason** so the club can ask again · **Ask AI for the best hall** · club directory and reports. It cannot review, approve or publish events.
 
 ### Club directory
 
@@ -166,7 +169,7 @@ The model line is cleaned (no links, emojis or markdown, one sentence), rejected
 
 ### 5.3 Hall recommendation
 
-When a club fills the request form, the hall picker shows every hall with its capacity, facilities and a live **fit** label for the number of people the club expects: _Good fit_, _Comfortable_, _Almost full_, _Much larger than needed_, _Too small_, or _Already requested_ at that time. Pressing **Recommend a hall** asks the AI: the server ranks the halls (capacity fit, whether the hall is free at that date and time, and which kind of hall suits the event: labs for workshops, a sports hall for sports, a stage for cultural evenings), and the model writes a two-sentence explanation from that ranked data only. Without a key the same ranking comes with a rule-based explanation. A club only ever learns that a hall is taken, never which other club's event is in it. The recommendation is advisory: the **Events Section (or OSA) gives the permission**, and the online review and final approval cannot be completed until the hall is approved.
+Once an event has been circulated and students are registering, the club opens it and the hall picker shows every hall with its capacity, facilities and a live **fit** label for the number of people **who actually registered** (or the expected attendance while there are none): _Good fit_, _Comfortable_, _Almost full_, _Much larger than needed_, _Too small_, or _Already booked_ at that time. Pressing **Recommend a hall** asks the AI: the server ranks the halls (capacity fit, whether the hall is free at that date and time, and which kind of hall suits the event: labs for workshops, a sports hall for sports, a stage for cultural evenings), and the model writes a two-sentence explanation from that ranked data only. Without a key the same ranking comes with a rule-based explanation. The recommendation is advisory: the club sends the request with a **priority** (high, medium, low) and the **Events Section allocates the hall**, assigns another or refuses with a reason. The registered count is read from the database on the server, never taken from the browser.
 
 ### 5.4 Duplicate-club check
 
@@ -200,7 +203,7 @@ flowchart LR
 
 **The key idea: the same rules run twice.** The approval engine in `shared/src/gov` is plain JavaScript used by both sides. The browser runs it for an instant answer, then the backend runs it again on the stored state with the person's real role, inside one database transaction, and its result replaces the browser's. A change the server refuses is dropped and reported. So the interface feels instant but cannot be used to bypass a rule.
 
-**What each portal receives is decided by the server.** Students get published events only. A club gets its own requests in full and other clubs' pending requests only as a time slot (so venue clashes still show). Administrators get everything.
+**What each portal receives is decided by the server.** Students get circulated events only, plus the club applications they made themselves. A club gets its own requests in full and other clubs' events only once circulated. OSA gets everything. The Events Section gets only circulated events, since those are the only ones that can have a hall.
 
 ```
 frontend/   React 18 + Vite + Tailwind. Built into frontend/dist and served by the backend (or any static host).
@@ -215,7 +218,7 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 ## 7. Security and trust
 
 - **One door per account.** `POST /auth/login` takes the chosen portal. A student cannot enter the Administrator screen; a wrong password and a wrong door give the same message and count as the same failed attempt (brute-force lockout).
-- **Role checks on the server for every action**, tested by calling the API directly and bypassing the screens. The Events Section cannot give final approval; a club cannot touch another club's request.
+- **Role checks on the server for every action**, tested by calling the API directly and bypassing the screens. The Events Section cannot review or approve events and OSA cannot allocate halls; a club cannot touch another club's request; a student cannot decide a club application.
 - **Passwords** are hashed with bcrypt. Access tokens last two hours; a rotating refresh token in an httpOnly cookie detects reuse and revokes the session family.
 - **Least data per portal** (see section 6) and an assistant that only sees what the asking role may see.
 - **Uploads are validated by file signature**, not by name or declared type; unknown document fields are dropped; every action argument is bounded in size and depth.
@@ -239,12 +242,12 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Data lives in a handful
 
 | Suite                                                                                                                     | Tests | Status |
 | ------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Shared: workflow engine, hall ranking and permission, notification copy, permissions                                      | 30    | pass   |
-| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 75    | pass   |
-| Frontend screens against an in-memory API running the real engine                                                         | 17    | pass   |
-| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 34    | pass   |
+| Shared: workflow engine, hall ranking and permission, notification copy, permissions                                      | 35    | pass   |
+| Backend: auth, governance rules, per-portal views, seats and races, uploads, chat scope, quotes, hall advice, Groq client | 79    | pass   |
+| Frontend screens against an in-memory API running the real engine                                                         | 19    | pass   |
+| **End-to-end journeys in real Chrome** against the real backend (every role, every main flow)                             | 38    | pass   |
 
-Highlights: the full approval path through four roles, the Events Section being refused final approval **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
+Highlights: the full approval path through four roles, the Events Section being refused any review or approval step **even when the screen is bypassed**, a **race test where two students take the last seat** (exactly one succeeds), off-topic chat refusals, and 36 screens opened with no console errors. Lint is clean. The browser tests run on a throwaway database, never on the real one.
 
 ## 10. Run it locally
 

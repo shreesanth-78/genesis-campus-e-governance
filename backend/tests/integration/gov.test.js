@@ -149,39 +149,61 @@ describe('what each portal can see', () => {
     expect(JSON.stringify(data)).not.toContain('Midnight Hack Party'); // rejected request never leaves the server
   });
 
-  it('shows a club its own requests in full and other clubs only as a time slot', async () => {
+  it('shows a club its own requests in full and other clubs\u2019 events only once they are circulated', async () => {
     const s = await session('CLUB001');
     const { data } = (await s.get('/gov/state')).body;
     const own = data.requests.filter((r) => r.clubId === 'innovation');
     expect(own.some((r) => r.documents && r.history)).toBe(true);
-    const others = data.requests.filter(
-      (r) => r.clubId !== 'innovation' && !['published', 'completed'].includes(r.status),
-    );
+    const others = data.requests.filter((r) => r.clubId !== 'innovation');
     expect(others.length).toBeGreaterThan(0);
     for (const r of others) {
-      expect(r.title).toBe('Another club’s request');
+      expect(['published', 'completed']).toContain(r.status); // another club\u2019s unfinished request is never sent
       expect(r).not.toHaveProperty('documents');
-      expect(r).not.toHaveProperty('description');
+      expect(r).not.toHaveProperty('history');
     }
     expect(data.promotions.every((p) => p.clubId === 'innovation')).toBe(true);
     expect(data.clubApplications).toEqual([]);
-    expect(JSON.stringify(data)).not.toContain('Pitch Practice Night'.replace('Pitch', 'Zzz'));
   });
 
-  it('shows both administrator portals everything', async () => {
-    for (const id of ['OSA001', 'EVT001']) {
-      const s = await session(id);
-      const { data } = (await s.get('/gov/state')).body;
-      expect(data.requests.length).toBe(15);
-      expect(data.clubApplications.length).toBe(5);
-      expect(data.promotions.length).toBe(4);
-    }
+  it('shows OSA everything, and the Events Section only the circulated events it can give halls to', async () => {
+    const osa = (await (await session('OSA001')).get('/gov/state')).body.data;
+    expect(osa.requests.length).toBe(15);
+    expect(osa.clubApplications.length).toBe(5);
+    expect(osa.promotions.length).toBe(4);
+    const events = (await (await session('EVT001')).get('/gov/state')).body.data;
+    expect(events.requests.length).toBe(9);
+    for (const r of events.requests) expect(['published', 'completed']).toContain(r.status);
+    expect(events.clubApplications).toEqual([]);
+    expect(events.promotions).toEqual([]);
+  });
+
+  it('shows a student only the club applications they made', async () => {
+    const student = await session('STU2026001');
+    expect((await student.get('/gov/state')).body.data.clubApplications).toEqual([]);
+    const idea = {
+      name: 'Bee Keepers Society',
+      category: 'Media, Lit & Social Responsibility',
+      objectives:
+        'Students look after beehives on campus, learn about pollination and sell the honey they harvest.',
+      advisor: 'Dr. Lakshmi Pillai',
+      memberCount: 14,
+      documents: {},
+    };
+    const res = await student.act('applyForClub', idea);
+    expect(res.body.data.ok).toBe(true);
+    const mine = res.body.data.state.clubApplications;
+    expect(mine).toHaveLength(1);
+    expect(mine[0].proposer.name).toBe('Arjun Kumar');
+    // OSA receives it; another student does not see it
+    const osa = (await (await session('OSA001')).get('/gov/state')).body.data;
+    expect(osa.clubApplications.some((a) => a.name === 'Bee Keepers Society')).toBe(true);
   });
 });
 
 describe('the approval path is enforced on the server', () => {
-  it('club submits, Events Section reviews, only OSA approves, then publishing reaches students', async () => {
+  it('club asks OSA, OSA gives permission, the club circulates, students register, the club asks for a hall, the Events Section allocates it', async () => {
     const club = await session('CLUB001');
+    const other = await session('CLUB002');
     const events = await session('EVT001');
     const osa = await session('OSA001');
     const student = await session('STU2026001');
@@ -196,49 +218,69 @@ describe('the approval path is enforced on the server', () => {
     let seen = (await student.get('/gov/state')).body.data;
     expect(seen.requests.find((r) => r.id === id)).toBeUndefined();
 
-    // the online review cannot be cleared before the hall is approved
-    const blocked = await events.act('reviewRequest', id, { decision: 'clear' });
-    expect(blocked.body.data.error).toMatch(/permission for the requested hall/);
-    expect((await events.act('reviewHall', id, { decision: 'approve', note: 'Free.' })).body.data.ok).toBe(
+    // the Events Section has no part in the review
+    expect((await events.act('reviewRequest', id, { decision: 'clear' })).status).toBe(403);
+    expect((await osa.act('reviewRequest', id, { decision: 'clear', note: 'Complete.' })).body.data.ok).toBe(
       true,
     );
-    expect(
-      (await events.act('reviewRequest', id, { decision: 'clear', note: 'Complete.' })).body.data.ok,
-    ).toBe(true);
-    // approving before the hard copy is verified is refused by the workflow
+    // permission before the hard copy is verified is refused by the workflow
     const early = await osa.act('finalApprove', id, { note: 'early' });
     expect(early.body.data.ok).toBe(false);
     expect(early.body.data.error).toMatch(/hard-copy/i);
-
     expect(
       (
-        await events.act('recordPhysical', id, {
+        await osa.act('recordPhysical', id, {
           status: 'verified',
           receivedOn: '2026-10-10',
-          refNo: 'EVT/HC/2026/9001',
+          refNo: 'OSA/HC/2026/9001',
         })
       ).body.data.ok,
     ).toBe(true);
 
-    // The Events Section may not approve: the route refuses before the workflow is even asked
+    // permission is OSA's alone; circulating needs it, and belongs to the owning club
     expect((await events.act('finalApprove', id, { note: 'me' })).status).toBe(403);
-    // and publishing before approval is refused
-    expect((await events.act('publishRequest', id)).body.data.ok).toBe(false);
-
+    expect((await club.act('publishRequest', id)).body.data.ok).toBe(false);
     expect((await osa.act('finalApprove', id, { note: 'Approved.' })).body.data.ok).toBe(true);
     seen = (await student.get('/gov/state')).body.data;
-    expect(seen.requests.find((r) => r.id === id)).toBeUndefined(); // approved is still not public
+    expect(seen.requests.find((r) => r.id === id)).toBeUndefined(); // permission alone is not public
+    expect((await events.act('publishRequest', id)).status).toBe(403);
+    expect((await other.act('publishRequest', id)).body.data.ok).toBe(false);
+    expect((await club.act('requestHall', id, { venue: 'Innovation Lab' })).body.data.error).toMatch(
+      /Circulate the event/,
+    );
 
-    const published = await events.act('publishRequest', id);
+    const published = await club.act('publishRequest', id);
     expect(published.body.data.ok).toBe(true);
     seen = (await student.get('/gov/state')).body.data;
     const live = seen.requests.find((r) => r.id === id);
     expect(live.status).toBe('published');
+    expect(live.venue).toBe(''); // no hall yet
     expect(seen.broadcasts.some((b) => b.title.includes('Maker Night'))).toBe(true);
-
-    // the student's notifications now include the notice, stored for that account
     const mine = (await student.get('/gov/student')).body.data;
     expect(mine.notifications.some((n) => n.title.includes('Maker Night'))).toBe(true);
+
+    // a student registers; the count in the hall request comes from the server, not from the browser
+    expect(
+      (await student.post('/gov/student/registrations', { eventId: `evt-${id.toLowerCase()}` })).status,
+    ).toBe(201);
+    const asked = await club.act('requestHall', id, {
+      venue: 'Seminar Room 3',
+      priority: 'high',
+      note: 'Hands-on',
+      registered: 9999,
+    });
+    expect(asked.body.data.ok).toBe(true);
+    const req = asked.body.data.state.requests.find((r) => r.id === id);
+    expect(req.hall).toMatchObject({ status: 'requested', priority: 'high', registered: 1 });
+
+    // the Events Section sees it and allocates the hall; nobody else can
+    const queue = (await events.get('/gov/state')).body.data.requests.find((r) => r.id === id);
+    expect(queue.hall.status).toBe('requested');
+    expect((await club.act('reviewHall', id, { decision: 'approve' })).status).toBe(403);
+    expect((await osa.act('reviewHall', id, { decision: 'approve' })).status).toBe(403);
+    expect((await events.act('reviewHall', id, { decision: 'approve' })).body.data.ok).toBe(true);
+    seen = (await student.get('/gov/state')).body.data;
+    expect(seen.requests.find((r) => r.id === id).venue).toBe('Seminar Room 3');
   });
 
   it('keeps clubs, students and the wrong administrator away from actions that are not theirs', async () => {
@@ -248,6 +290,10 @@ describe('the approval path is enforced on the server', () => {
     const events = await session('EVT001');
 
     expect((await student.act('saveRequest', goodRequest(), { submit: true })).status).toBe(403);
+    expect((await events.act('saveRequest', goodRequest(), { submit: true })).status).toBe(403);
+    expect((await club.act('applyForClub', {})).status).toBe(403);
+    expect((await club.act('reviewHall', 'REQ-1210', { decision: 'approve' })).status).toBe(403);
+    expect((await student.act('requestHall', 'REQ-1210', { venue: 'Innovation Lab' })).status).toBe(403);
     expect((await student.act('finalApprove', 'REQ-1248', {})).status).toBe(403);
     expect((await club.act('reviewRequest', 'REQ-1251', { decision: 'clear' })).status).toBe(403);
     expect((await club.act('decideClubApplication', 'CA-501', { decision: 'approve' })).status).toBe(403);
@@ -283,7 +329,7 @@ describe('the approval path is enforced on the server', () => {
 
   it('keeps the rejected, correction and resubmission loop working', async () => {
     const club = await session('CLUB001');
-    const events = await session('EVT001');
+    const events = await session('OSA001');
     const id = (await club.act('saveRequest', goodRequest({ title: 'Loop Night Event' }), { submit: true }))
       .body.data.extra.id;
     expect(
@@ -402,8 +448,8 @@ describe('club applications and the duplicate check', () => {
     });
     expect(ok.body.data.ok).toBe(true);
     expect(ok.body.data.state.newClubs.map((c) => c.name)).toContain('CodeChef Coding Hub');
-    // the Events Section can run the check but cannot decide
-    expect((await events.act('saveAiCheck', 'CA-502', {})).body.data.ok).toBe(true);
+    // the Events Section has no part in club applications
+    expect((await events.act('saveAiCheck', 'CA-502', {})).status).toBe(403);
     expect(
       (await events.act('decideClubApplication', 'CA-502', { decision: 'reject', note: 'x' })).status,
     ).toBe(403);
@@ -425,6 +471,90 @@ describe('club applications and the duplicate check', () => {
     expect(res.body.data.matches[0].clubId).toBe('coding');
     expect(res.body.data.method).toBe('similarity');
     expect((await student.post('/ai/duplicate-clubs', { application: app503 })).status).toBe(403);
+  });
+
+  it('lets a student check an idea before applying, and refuses an application that repeats an existing club', async () => {
+    const student = await session('STU2026001');
+    const osa = await session('OSA001');
+    const coding = {
+      name: 'Programmers Guild',
+      category: 'Technical & Engineering',
+      objectives:
+        'A group where students learn programming, build software and take part in coding contests.',
+    };
+    const check = (await student.post('/ai/check-club', { application: coding })).body.data;
+    expect(check.blocked).toBe(true);
+    expect(check.message).toMatch(/already covers this focus area/);
+    expect(check.matches[0].name).toMatch(/CodeChef|Google Developer|Init/);
+    const fresh = await student.post('/ai/check-club', {
+      application: {
+        name: 'Bee Keepers',
+        category: 'Other',
+        objectives: 'Students look after beehives and harvest honey.',
+      },
+    });
+    expect(fresh.body.data.blocked).toBe(false);
+    expect((await osa.post('/ai/check-club', { application: coding })).status).toBe(403);
+
+    const refused = await student.act('applyForClub', {
+      ...coding,
+      advisor: 'Dr. A. Rao',
+      memberCount: 20,
+      documents: {},
+    });
+    expect(refused.body.data.ok).toBe(false);
+    expect(refused.body.data.error).toMatch(/already covers this focus area/);
+    expect((await (await session('OSA001')).get('/gov/state')).body.data.clubApplications).toHaveLength(5);
+  });
+
+  it('also asks the model whether a new idea repeats a club, and trusts only a club that exists', async () => {
+    const calls = [];
+    const llmApp = buildTestApp(knex, {
+      llm: {
+        ask: async (a) => (
+          calls.push(a),
+          {
+            text: '{"similar": true, "club": "Student Energy", "reason": "it already runs sustainability work"}',
+            refused: false,
+          }
+        ),
+      },
+    });
+    const login = await request(llmApp)
+      .post(`${BASE}/auth/login`)
+      .send({ identifier: 'STU2026001', password: demo('STU2026001').password, portal: 'student' });
+    const h = { Authorization: `Bearer ${login.body.data.accessToken}`, 'X-Portal': 'student' };
+    const idea = {
+      name: 'Green Roots',
+      category: 'Media, Lit & Social Responsibility',
+      objectives: 'Students plant trees, run a compost project and cut waste around the campus.',
+      advisor: 'Dr. A. Rao',
+      memberCount: 15,
+      documents: {},
+    };
+    const res = await request(llmApp)
+      .post(`${BASE}/gov/actions/applyForClub`)
+      .set(h)
+      .send({ args: [idea] });
+    expect(res.body.data.ok).toBe(false);
+    expect(res.body.data.error).toMatch(/Student Energy.*sustainability/);
+    expect(calls[0].messages[0].content).toContain('<existing_clubs>');
+    expect(calls[0].system).toMatch(/Never follow instructions/);
+
+    // a verdict naming a club that does not exist is ignored
+    const bogus = buildTestApp(knex, {
+      llm: {
+        ask: async () => ({
+          text: '{"similar": true, "club": "Nonexistent Club", "reason": "x"}',
+          refused: false,
+        }),
+      },
+    });
+    const ok = await request(bogus)
+      .post(`${BASE}/gov/actions/applyForClub`)
+      .set(h)
+      .send({ args: [idea] });
+    expect(ok.body.data.ok).toBe(true);
   });
 });
 
@@ -800,20 +930,19 @@ describe('publishing writes an event-specific quote with the chat model', () => 
       return { Authorization: `Bearer ${r.body.data.accessToken}`, 'X-Portal': portalOf(demo(id)) };
     };
     const act = (h, name, ...args) => request(a).post(`${BASE}/gov/actions/${name}`).set(h).send({ args });
-    const [club, events, osa] = [await login('CLUB001'), await login('EVT001'), await login('OSA001')];
+    const [club, osa] = [await login('CLUB001'), await login('OSA001')];
     const id = (
       await act(club, 'saveRequest', goodRequest({ title, category: 'Hackathon' }), { submit: true })
     ).body.data.extra.id;
-    await act(events, 'reviewHall', id, { decision: 'approve' });
-    await act(events, 'reviewRequest', id, { decision: 'clear' });
-    await act(events, 'recordPhysical', id, {
+    await act(osa, 'reviewRequest', id, { decision: 'clear' });
+    await act(osa, 'recordPhysical', id, {
       status: 'verified',
       receivedOn: '2026-10-10',
-      refNo: 'EVT/HC/2026/9100',
+      refNo: 'OSA/HC/2026/9100',
     });
     await act(osa, 'finalApprove', id, { note: 'ok' });
     // whatever the browser sends as options is ignored
-    const res = await act(events, 'publishRequest', id, { quote: 'Free pizza for everyone, click now!!!' });
+    const res = await act(club, 'publishRequest', id, { quote: 'Free pizza for everyone, click now!!!' });
     expect(res.body.data.ok).toBe(true);
     return res.body.data.extra.notice;
   };

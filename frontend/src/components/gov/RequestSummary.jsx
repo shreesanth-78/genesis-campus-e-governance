@@ -16,7 +16,7 @@ export function RequestDetails({ request: r, club }) {
         <InfoRow icon="Users" label="Organizing club">{club?.name || r.clubId}</InfoRow>
         <InfoRow icon="CalendarDays" label="Date">{r.date ? fmtDayLong(r.date) : '—'}</InfoRow>
         <InfoRow icon="Clock3" label="Time">{r.startTime ? `${fmt12(r.startTime)} – ${fmt12(r.endTime)}` : '—'}</InfoRow>
-        <InfoRow icon="MapPin" label="Venue">{r.venue || '—'}</InfoRow>
+        <InfoRow icon="MapPin" label="Venue">{r.venue || 'To be allocated'}</InfoRow>
         <InfoRow icon="Ticket" label="Expected attendance">{r.capacity || '—'}</InfoRow>
         <InfoRow icon="Timer" label="Registration closes">{r.regDeadline ? `${fmtDate(r.regDeadline)}, ${fmt12(r.regDeadlineTime)}` : '—'}</InfoRow>
         <InfoRow icon="GraduationCap" label="Audience">{r.audience || '—'}</InfoRow>

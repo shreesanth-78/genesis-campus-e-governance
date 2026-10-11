@@ -60,7 +60,7 @@ describe('notification copy', () => {
     expect(res.ok).toBe(true);
     expect(res.notice.title).toBe('⚙️ Robotics Arena Showdown just dropped');
     expect(res.notice.body).toMatch(
-      /Hut Labs opens registration for 06 Nov 2026, 10:00 AM at West Sports Hall/,
+      /Hut Labs opens registration for 06 Nov 2026, 10:00 AM at a hall announced soon/,
     );
     expect(res.notice.eventId).toBe('evt-req-1255');
   });

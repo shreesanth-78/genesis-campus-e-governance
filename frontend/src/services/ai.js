@@ -17,6 +17,7 @@ import {
   precheckRequest as precheck,
 } from '@gcc/shared/gov/ai';
 import { hallSummary, rankHalls } from '@gcc/shared/gov/halls';
+import { checkClubIdea as localClubIdeaCheck } from '../store/workflow';
 import { getAccessToken } from '../utils/http';
 
 const API = `${(import.meta.env?.VITE_API_URL ?? '').replace(/\/$/, '')}/api/v1/ai`;
@@ -102,4 +103,20 @@ export async function recommendHalls(input, { requests = [] } = {}) {
   if (remote?.rankings) return { rankings: remote.rankings, summary: remote.summary, source: remote.engine === 'ai' ? 'ai-service' : 'rules' };
   const rankings = rankHalls({ ...input, requests, ignoreId: input.requestId });
   return { rankings, summary: hallSummary(rankings, input), source: 'local' };
+}
+
+/* ------------------------------------------------------------------ */
+/* Check an idea for a new club                                        */
+/* ------------------------------------------------------------------ */
+/**
+ * Before a student fills in the whole application: does a club (or a pending application) already cover this idea?
+ * The API also asks the model for a meaning-level opinion; offline, the built-in focus-area comparison answers.
+ */
+export async function checkClubIdea(application, state) {
+  const remote = await callApi('/check-club', { application });
+  if (remote && typeof remote.blocked === 'boolean') {
+    return { blocked: remote.blocked, message: remote.message || '', matches: remote.matches || [], summary: remote.summary || '', source: remote.engine === 'ai' ? 'ai-service' : 'rules' };
+  }
+  const local = localClubIdeaCheck(state, application);
+  return { blocked: Boolean(local.blocked), message: local.blocked, matches: local.matches, summary: local.summary, source: 'local' };
 }

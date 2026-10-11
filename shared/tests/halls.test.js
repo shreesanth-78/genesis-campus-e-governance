@@ -90,135 +90,131 @@ describe('ranking halls for an expected attendance', () => {
   });
 });
 
-describe('giving permission for the hall', () => {
-  it('a new request starts with the hall pending; approving it unlocks the online review and final approval', () => {
-    let s = submit(createSeedState());
-    const id = s.id;
-    s = s.state;
-    expect(hallStatus(s.requests.find((r) => r.id === id))).toBe('pending');
-    expect(wf.reviewRequest(s, events, id, { decision: 'clear' }).ok).toBe(false);
-    s = must(wf.reviewHall(s, events, id, { decision: 'approve', note: 'Free that evening.' })).state;
-    const r = s.requests.find((x) => x.id === id);
-    expect(r.hall).toMatchObject({ status: 'approved', by: events.name, requestedVenue: 'Seminar Room 3' });
-    expect(r.venue).toBe('Seminar Room 3');
-    s = must(wf.reviewRequest(s, events, id, { decision: 'clear' })).state;
-    s = must(
-      wf.recordPhysical(s, events, id, { status: 'verified', receivedOn: '2026-10-10', refNo: 'EVT/HC/9' }),
-    ).state;
-    expect(wf.finalApprove(s, osa, id).ok).toBe(true);
-  });
+// An event that has been circulated to students, ready for its club to ask for a hall.
+function circulated(state = createSeedState(), over = {}) {
+  const r = submit(state, over);
+  let s = must(wf.reviewRequest(r.state, osa, r.id, { decision: 'clear' })).state;
+  s = must(
+    wf.recordPhysical(s, osa, r.id, { status: 'verified', receivedOn: '2026-10-10', refNo: 'OSA/HC/9' }),
+  ).state;
+  s = must(wf.finalApprove(s, osa, r.id)).state;
+  s = must(wf.publishRequest(s, club, r.id)).state;
+  return { id: r.id, state: s };
+}
 
-  it('final approval is refused while the hall is not approved, even if the other checks are done', () => {
-    let s = submit(createSeedState());
-    const id = s.id;
-    s = s.state;
-    s = {
-      ...s,
-      requests: s.requests.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              onlineReview: { status: 'cleared', by: 'x', at: 'x', note: '' },
-              physical: {
-                status: 'verified',
-                by: 'x',
-                at: 'x',
-                receivedOn: '2026-10-10',
-                refNo: 'r',
-                note: '',
-              },
-            }
-          : r,
-      ),
-    };
-    expect(wf.finalApprove(s, osa, id).error).toMatch(/hall must be approved/);
-  });
-
-  it('the Events Section can assign a different hall, but only one that holds the crowd and is free', () => {
-    let s = submit(createSeedState(), { capacity: 40 });
-    const id = s.id;
-    s = s.state;
-    expect(wf.reviewHall(s, events, id, { decision: 'reassign', venue: 'Nowhere Hall' }).ok).toBe(false);
-    expect(wf.reviewHall(s, events, id, { decision: 'reassign', venue: 'Seminar Room 3' }).error).toMatch(
-      /already the requested hall/,
+describe('requesting and allocating a hall', () => {
+  it('a new request has no hall; it can only be requested after the event is circulated', () => {
+    const r = submit(createSeedState());
+    const req = r.state.requests.find((x) => x.id === r.id);
+    expect(hallStatus(req)).toBe('none');
+    expect(req.venue).toBe('');
+    expect(wf.requestHall(r.state, club, r.id, { venue: 'Innovation Lab', registered: 30 }).error).toMatch(
+      /Circulate the event/,
     );
-    const taken = s.requests.find((r) => r.status === 'published' && r.venue === 'Main Auditorium');
-    const clash = submit(s, {
-      venue: 'Innovation Lab',
+  });
+
+  it('the club asks with the registered count and a priority; the Events Section approves and the hall appears', () => {
+    let { id, state } = circulated();
+    state = must(
+      wf.requestHall(state, club, id, {
+        venue: 'Innovation Lab',
+        priority: 'high',
+        note: 'Needs power sockets',
+        registered: 52,
+      }),
+    ).state;
+    let r = state.requests.find((x) => x.id === id);
+    expect(r.hall).toMatchObject({
+      status: 'requested',
+      requestedVenue: 'Innovation Lab',
+      priority: 'high',
+      registered: 52,
+    });
+    expect(r.venue).toBe('');
+    state = must(wf.reviewHall(state, events, id, { decision: 'approve', note: 'Free that evening.' })).state;
+    r = state.requests.find((x) => x.id === id);
+    expect(r.hall).toMatchObject({ status: 'approved', by: events.name });
+    expect(r.venue).toBe('Innovation Lab');
+  });
+
+  it('a hall that cannot hold the registered crowd is refused, and so is one already allocated at that time', () => {
+    const { id, state } = circulated();
+    expect(wf.requestHall(state, club, id, { venue: 'Seminar Room 3', registered: 50 }).error).toMatch(
+      /holds 45, fewer than the 50 registered/,
+    );
+    expect(wf.requestHall(state, club, id, { venue: 'Nowhere', registered: 5 }).ok).toBe(false);
+    expect(
+      wf.requestHall(state, club, id, { venue: 'Innovation Lab', priority: 'urgent', registered: 5 }).ok,
+    ).toBe(false);
+    const taken = state.requests.find((x) => x.status === 'published' && x.venue === 'Main Auditorium');
+    const clash = circulated(state, {
+      title: 'Clashing Night Event',
       date: taken.date,
       startTime: taken.startTime,
       endTime: taken.endTime,
       regDeadline: '2026-10-11',
-      capacity: 30,
     });
     expect(
-      wf.reviewHall(clash.state, events, clash.id, { decision: 'reassign', venue: 'Main Auditorium' }).error,
-    ).toMatch(/already requested/);
+      wf.requestHall(clash.state, club, clash.id, { venue: 'Main Auditorium', registered: 100 }).error,
+    ).toMatch(/already allocated/);
+  });
+
+  it('the Events Section can allocate a different hall that holds the crowd and is free', () => {
+    let { id, state } = circulated();
+    state = must(wf.requestHall(state, club, id, { venue: 'Seminar Room 3', registered: 30 })).state;
+    expect(wf.reviewHall(state, events, id, { decision: 'reassign', venue: 'Nowhere Hall' }).ok).toBe(false);
+    expect(wf.reviewHall(state, events, id, { decision: 'reassign', venue: 'Seminar Room 3' }).error).toMatch(
+      /Use Approve/,
+    );
     const moved = must(
-      wf.reviewHall(s, events, id, {
+      wf.reviewHall(state, events, id, {
         decision: 'reassign',
         venue: 'Innovation Lab',
-        note: 'The seminar room is being repainted.',
+        note: 'Room is being repainted.',
       }),
     );
     const r = moved.state.requests.find((x) => x.id === id);
     expect(r.venue).toBe('Innovation Lab');
-    expect(r.hall).toMatchObject({ status: 'approved', requestedVenue: 'Seminar Room 3' });
-    expect(r.history.at(-1).action).toBe('Hall changed');
-    // a hall that is too small is refused
-    const crowd = submit(createSeedState(), { capacity: 100, venue: 'Central Library Hall' });
-    expect(
-      wf.reviewHall(crowd.state, events, crowd.id, { decision: 'reassign', venue: 'Innovation Lab' }).error,
-    ).toMatch(/holds 60/);
+    expect(r.hall).toMatchObject({
+      status: 'approved',
+      requestedVenue: 'Seminar Room 3',
+      note: 'Room is being repainted.',
+    });
+    expect(r.history.at(-1).action).toBe('Different hall allocated');
   });
 
-  it('rejecting the hall sends the request back to the club with the reason; a new hall asks permission again', () => {
-    let s = submit(createSeedState());
-    const id = s.id;
-    s = s.state;
-    expect(wf.reviewHall(s, events, id, { decision: 'reject', note: '' }).ok).toBe(false);
-    s = must(
-      wf.reviewHall(s, events, id, { decision: 'reject', note: 'The seminar room is closed for exams.' }),
+  it('rejecting needs a reason, leaves the event circulating, and lets the club ask again', () => {
+    let { id, state } = circulated();
+    state = must(wf.requestHall(state, club, id, { venue: 'Seminar Room 3', registered: 30 })).state;
+    expect(wf.reviewHall(state, events, id, { decision: 'reject', note: '' }).ok).toBe(false);
+    state = must(
+      wf.reviewHall(state, events, id, { decision: 'reject', note: 'Closed for exams that week.' }),
     ).state;
-    let r = s.requests.find((x) => x.id === id);
-    expect(r.status).toBe('correction_requested');
-    expect(r.hall.status).toBe('rejected');
-    expect(r.feedback.at(-1)).toMatchObject({ type: 'correction', reasons: ['Hall not approved'] });
-    s = must(
-      wf.saveRequest(s, club, { ...REQ, venue: 'Innovation Lab', capacity: 40 }, { submit: true, id }),
-    ).state;
-    r = s.requests.find((x) => x.id === id);
-    expect(r.status).toBe('submitted');
-    expect(r.hall).toMatchObject({ status: 'pending', requestedVenue: 'Innovation Lab' });
+    let r = state.requests.find((x) => x.id === id);
+    expect(r.status).toBe('published');
+    expect(r.hall).toMatchObject({ status: 'rejected', note: 'Closed for exams that week.' });
+    state = must(wf.requestHall(state, club, id, { venue: 'Innovation Lab', registered: 30 })).state;
+    r = state.requests.find((x) => x.id === id);
+    expect(r.hall).toMatchObject({ status: 'requested', requestedVenue: 'Innovation Lab' });
   });
 
-  it('changing the hall of an approved request asks for permission again; keeping it does not', () => {
-    let s = submit(createSeedState());
-    const id = s.id;
-    s = must(wf.reviewHall(s.state, events, id, { decision: 'approve' })).state;
-    s = { ...s, requests: s.requests.map((r) => (r.id === id ? { ...r, status: 'draft' } : r)) };
-    const same = must(wf.saveRequest(s, club, { ...REQ }, { submit: false, id })).state.requests.find(
-      (x) => x.id === id,
-    );
-    expect(same.hall.status).toBe('approved');
-    const moved = must(
-      wf.saveRequest(s, club, { ...REQ, venue: 'Innovation Lab' }, { submit: false, id }),
-    ).state.requests.find((x) => x.id === id);
-    expect(moved.hall.status).toBe('pending');
+  it('only the Events Section decides, only the owning club asks, and nothing can be decided before a request', () => {
+    let { id, state } = circulated();
+    expect(wf.reviewHall(state, events, id, { decision: 'approve' }).error).toMatch(/has not asked/);
+    expect(wf.requestHall(state, club2, id, { venue: 'Innovation Lab', registered: 5 }).ok).toBe(false);
+    expect(wf.requestHall(state, events, id, { venue: 'Innovation Lab', registered: 5 }).ok).toBe(false);
+    state = must(wf.requestHall(state, club, id, { venue: 'Innovation Lab', registered: 5 })).state;
+    expect(wf.reviewHall(state, club, id, { decision: 'approve' }).ok).toBe(false);
+    expect(wf.reviewHall(state, osa, id, { decision: 'approve' }).ok).toBe(false);
+    expect(wf.reviewHall(state, events, id, { decision: 'approve' }).ok).toBe(true);
   });
 
-  it('only the Events Section and OSA may decide; a club cannot', () => {
-    const s = submit(createSeedState());
-    expect(wf.reviewHall(s.state, club, s.id, { decision: 'approve' }).ok).toBe(false);
-    expect(wf.reviewHall(s.state, club2, s.id, { decision: 'approve' }).ok).toBe(false);
-    expect(wf.reviewHall(s.state, osa, s.id, { decision: 'approve' }).ok).toBe(true);
-  });
-
-  it('the sample data keeps its reviewed and published requests approved and the rest pending', () => {
+  it('the sample data: live events have a hall, one hall request waits for the Events Section, the rest have none', () => {
     const s = createSeedState();
-    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1048'))).toBe('approved'); // published
-    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1244'))).toBe('approved'); // online review cleared
-    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1251'))).toBe('pending'); // waiting for review
+    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1048'))).toBe('approved');
+    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1210'))).toBe('requested');
+    expect(hallStatus(s.requests.find((r) => r.id === 'REQ-1251'))).toBe('none');
+    expect(s.requests.find((r) => r.id === 'REQ-1251').venue).toBe('');
     expect(VENUES.every((v) => v.kind && v.facilities.length)).toBe(true);
   });
 });

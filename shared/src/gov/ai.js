@@ -37,6 +37,37 @@ const STOP = new Set([
   'run',
   'new',
 ]);
+// Words that mean the same thing share one concept, so "programming", "coding" and "software development" overlap even
+// though no word is common. This is the offline, rule-based half of the similarity check; the API adds a model.
+const CONCEPT_GROUPS = {
+  _code:
+    'code coding coder program programming programmer software developer development dev hacking hackathon algorithm competitive codechef web app apps',
+  _robot: 'robot robots robotic robotics automation drone drones arduino embedded mechatronics',
+  _ai: 'ai artificial intelligence ml machine learning deep neural data analytics science tensor',
+  _iot: 'iot internet things sensors hardware electronics',
+  _music: 'music musical band singing sing vocal vocals choir instrument instruments beatboxing song songs',
+  _dance: 'dance dancing choreography dancer dancers classical folk',
+  _drama: 'drama theatre theater acting actor stage play plays performing mime skit',
+  _film: 'film films movie movies cinema cinematography video videography',
+  _photo: 'photography photo photos photographer camera visual',
+  _art: 'art arts fine craft crafts painting drawing sketching design designing graphic ui ux',
+  _business:
+    'entrepreneur entrepreneurs entrepreneurship startup startups venture ventures business founder founders management',
+  _social:
+    'social volunteering volunteer volunteers service community charity ngo outreach responsibility sustainability environment conservation',
+  _writing:
+    'literary literature writing writer writers poetry poem poems stories story books reading creative journalism',
+  _speak: 'debate debating speaking speaker public oratory elocution mun',
+  _sport: 'sport sports cricket football athletics fitness game games chess badminton',
+  _space: 'astronomy space astro astrophysics telescope stars',
+  _vehicle: 'automobile vehicle vehicles racing mechanical baja supra automotive',
+  _culture: 'culture cultural heritage tradition traditional indian language tamil',
+};
+const CONCEPT = new Map();
+Object.entries(CONCEPT_GROUPS).forEach(([key, words]) =>
+  words.split(' ').forEach((w) => CONCEPT.set(w, key)),
+);
+
 const tokens = (s = '') =>
   new Set(
     s
@@ -44,8 +75,8 @@ const tokens = (s = '') =>
       .replace(/&/g, ' and ')
       .replace(/[^a-z0-9 ]/g, ' ')
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !STOP.has(w))
-      .map((w) => w.replace(/(ing|s)$/, '')),
+      .filter((w) => w.length > 1 && !STOP.has(w))
+      .map((w) => CONCEPT.get(w) ?? CONCEPT.get(w.replace(/(ing|s)$/, '')) ?? w.replace(/(ing|s)$/, '')),
   );
 const jaccard = (a, b) => {
   if (!a.size || !b.size) return 0;
@@ -53,19 +84,42 @@ const jaccard = (a, b) => {
   a.forEach((t) => b.has(t) && inter++);
   return inter / (a.size + b.size - inter);
 };
+/** How much of the smaller description is covered by the other one (a short club blurb inside a long proposal). */
+const containment = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  a.forEach((t) => b.has(t) && inter++);
+  return inter / Math.min(a.size, b.size);
+};
+
+/** The focus areas a text is about (the shared concepts above), as a set. */
+const topics = (set) => new Set([...set].filter((t) => t.startsWith('_')));
+const dice = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  a.forEach((t) => b.has(t) && inter++);
+  return (2 * inter) / (a.size + b.size);
+};
+
+/** A proposal this similar to an existing club (0 to 1) is not accepted: the students are pointed to that club. */
+export const CLUB_BLOCK_SCORE = 0.45;
 
 export function localDuplicateCheck(application, existingClubs, objectivesOf = () => '') {
   const nameT = tokens(application.name);
-  const objT = tokens(`${application.objectives} ${application.description || ''}`);
+  const objT = tokens(`${application.name} ${application.objectives} ${application.description || ''}`);
   const matches = existingClubs
     .map((c) => {
       const nameScore = jaccard(nameT, tokens(c.name));
-      const objScore = jaccard(objT, tokens(`${c.blurb} ${objectivesOf(c)}`));
+      const clubT = tokens(`${c.name} ${c.tag || ''} ${c.blurb} ${objectivesOf(c)}`);
+      const wordScore = Math.max(jaccard(objT, clubT) * 2.2, containment(objT, clubT) * 0.9);
+      // Same focus area (music, robotics, coding...) counts even when the two texts share no words.
+      const topicScore = dice(topics(objT), topics(clubT));
+      const objScore = Math.max(wordScore, topicScore);
       const sameCategory = c.category === application.category || c.tag === application.category ? 1 : 0;
-      const score = Math.min(1, 0.45 * nameScore + 0.4 * Math.min(1, objScore * 2.2) + 0.15 * sameCategory);
+      const score = Math.min(1, 0.3 * nameScore + 0.55 * Math.min(1, objScore) + 0.15 * sameCategory);
       const reasons = [];
       if (nameScore > 0.25) reasons.push('Similar club name');
-      if (objScore > 0.08) reasons.push('Overlapping objectives and activities');
+      if (topicScore > 0 || wordScore > 0.2) reasons.push('Same focus area and activities');
       if (sameCategory) reasons.push(`Same category (${c.category})`);
       return { clubId: c.id, name: c.name, score: Number(score.toFixed(2)), reasons };
     })
