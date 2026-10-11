@@ -6,7 +6,7 @@
 
 **Live demo: https://genesis-campus-e-governance.onrender.com** (no install needed, see [how to use it](#3-try-it-live-and-a-five-minute-guided-demo))
 
-**Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
+**Demo Video: https://youtu.be/BQiipmnWZ_M or https://drive.google.com/file/d/1tAh9jmgysjJK1ktWP1lxLD3JDyeI5XnV/view?usp=sharing**
 
 > One campus. One place for every request. Clubs ask the Office of Student Affairs (OSA) for permission, circulate the approved event to collect registrations, and then ask the Events Section for a hall sized to the real crowd, all in a tracked, role-enforced workflow. Students discover, register for and get notified about events, and can propose new clubs, with an AI assistant that knows every club.
 
@@ -58,7 +58,7 @@ Design principles: **the server is the authority** (the browser only hides butto
 
 **Live link: https://genesis-campus-e-governance.onrender.com**
 
-**Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
+**Demo Video: https://youtu.be/BQiipmnWZ_M or https://drive.google.com/file/d/1tAh9jmgysjJK1ktWP1lxLD3JDyeI5XnV/view?usp=sharing**
 
 The portal is deployed as **one service on Render**: the same address serves the website and the API, with the database on Neon (see [section 11](#11-deployment)). Nothing to install and no sign-up: open the link and use one of the demo accounts below.
 
@@ -87,7 +87,7 @@ The portal is deployed as **one service on Render**: the same address serves the
 
 ### Guided demo (about eight minutes)
 
-**Demo Video: https://youtu.be/7rzY1jqgJJk or https://drive.google.com/file/d/1WhlwZdK4jo5WcUqvLUL3WfydC5lfTWVn/view?usp=sharing**
+**Demo Video: https://youtu.be/BQiipmnWZ_M or https://drive.google.com/file/d/1tAh9jmgysjJK1ktWP1lxLD3JDyeI5XnV/view?usp=sharing**
 
 Follow one event from request to registration. Use two windows (one normal, one private) so you can switch roles quickly.
 
